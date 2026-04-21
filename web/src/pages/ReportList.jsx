@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -30,7 +30,7 @@ export default function ReportList() {
       .catch(() => {}) // 过滤器加载失败不影响主流程
   }, [])
 
-  const fetchReports = () => {
+  const fetchReports = useCallback(() => {
     const url = filterProject ? `/reports?project_id=${filterProject}` : '/reports'
     return api.get(url)
       .then(data => {
@@ -41,7 +41,7 @@ export default function ReportList() {
         toast.error(err.message)
         return []
       })
-  }
+  }, [filterProject])
 
   // filterProject 变化时：重新加载，并清掉旧的轮询
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function ReportList() {
       clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
     }
-  }, [filterProject])
+  }, [fetchReports])
 
   // reports 变化时：有 pending 就保持轮询，全部完成就停
   // 这样无论通过何种方式（初始加载、手动触发）出现 pending 报告，都能自动开启轮询
@@ -63,7 +63,7 @@ export default function ReportList() {
       clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
     }
-  }, [reports])
+  }, [reports, fetchReports])
 
   // 同步 filterProject 到 URL
   const handleFilterChange = (val) => {
@@ -102,8 +102,8 @@ export default function ReportList() {
       await api.post('/executions', { project_id: projectId })
       const proj = projectOptions.find(p => p.id === projectId)
       toast.success(`「${proj?.name || ''}」巡检已启动`)
-      // 延迟 1s 再拉取，等待后端异步 goroutine 创建报告记录
-      setTimeout(fetchReports, 1000)
+      // 立即拉取一次，pending 报告出现后轮询机制会自动接管
+      fetchReports()
     } catch (err) {
       toast.error(err.message)
     } finally {

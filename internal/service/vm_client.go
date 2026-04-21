@@ -143,7 +143,7 @@ func (c *VMClient) doQuery(ctx context.Context, vmURL string) (*vmQueryResponse,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		return nil, fmt.Errorf("VM returned status %d: %s", resp.StatusCode, string(body))
 	}
 

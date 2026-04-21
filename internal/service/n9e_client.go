@@ -38,17 +38,17 @@ func NewN9EClient(endpoint, username, password string) *N9EClient {
 	}
 }
 
-// EnsureToken 确保 token 有效
-func (c *N9EClient) EnsureToken() error {
+// EnsureToken 确保 token 有效，支持 context 取消
+func (c *N9EClient) EnsureToken(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.token != "" && time.Now().Before(c.tokenExp) {
 		return nil
 	}
-	return c.login()
+	return c.login(ctx)
 }
 
-func (c *N9EClient) login() error {
+func (c *N9EClient) login(ctx context.Context) error {
 	// N9E 登录请求体
 	body := map[string]interface{}{
 		"username": c.username,
@@ -68,22 +68,24 @@ func (c *N9EClient) login() error {
 	for _, path := range paths {
 		url := c.endpoint + path
 		log.Printf("[N9E] trying login: %s", url)
-		resp, err := c.client.Post(url, "application/json", bytes.NewBuffer(jsonBody))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonBody))
+		if err != nil {
+			lastErr = fmt.Errorf("N9E login build request failed: %w", err)
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := c.client.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("N9E login request failed: %w", err)
 			continue
 		}
 
 		// 读取响应体
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		resp.Body.Close()
-		bodyLen := 200
-		if len(respBody) < bodyLen {
-			bodyLen = len(respBody)
-		}
-		log.Printf("[N9E] response status: %d, body: %s", resp.StatusCode, string(respBody)[:bodyLen])
 
 		if resp.StatusCode != http.StatusOK {
+			log.Printf("[N9E] login failed: status=%d, path=%s", resp.StatusCode, path)
 			lastErr = fmt.Errorf("N9E login returned status %d, path: %s", resp.StatusCode, path)
 			continue
 		}
@@ -135,16 +137,9 @@ func (c *N9EClient) login() error {
 	return lastErr
 }
 
-type n9eLoginResponse struct {
-	Error string `json:"err"`
-	Data  struct {
-		AccessToken string `json:"access_token"`
-	} `json:"dat"`
-}
-
 // GetAlertEvents 获取告警事件列表
 func (c *N9EClient) GetAlertEvents(ctx context.Context, stime, etime int64, groupTag string) ([]model.AlertResult, error) {
-	if err := c.EnsureToken(); err != nil {
+	if err := c.EnsureToken(ctx); err != nil {
 		return nil, err
 	}
 
@@ -172,7 +167,7 @@ func (c *N9EClient) GetAlertEvents(ctx context.Context, stime, etime int64, grou
 			return nil, fmt.Errorf("N9E request failed: %w", err)
 		}
 		// 确保每次迭代都关闭响应体，防止连接泄漏
-		respBody, readErr := io.ReadAll(resp.Body)
+		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		resp.Body.Close()
 		if readErr != nil {
 			return nil, fmt.Errorf("failed to read N9E response body: %w", readErr)
@@ -232,7 +227,7 @@ type n9eAlertResponse struct {
 
 // GetTargets 获取指定 group 下的服务器列表（分页自动汇聚）
 func (c *N9EClient) GetTargets(ctx context.Context, group string) ([]model.TargetInfo, error) {
-	if err := c.EnsureToken(); err != nil {
+	if err := c.EnsureToken(ctx); err != nil {
 		return nil, err
 	}
 
@@ -254,7 +249,7 @@ func (c *N9EClient) GetTargets(ctx context.Context, group string) ([]model.Targe
 		if err != nil {
 			return nil, fmt.Errorf("N9E targets request failed: %w", err)
 		}
-		body, readErr := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		resp.Body.Close()
 		if readErr != nil {
 			return nil, fmt.Errorf("failed to read N9E targets response: %w", readErr)

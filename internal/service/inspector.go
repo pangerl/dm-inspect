@@ -17,6 +17,9 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
+// vmQueryStep VM 范围查询的采样步长（秒），对应 5 分钟采样间隔
+const vmQueryStep = 300
+
 // Inspector 巡检执行引擎
 type Inspector struct {
 	vmClient  *VMClient
@@ -45,9 +48,9 @@ type TemplateConfig struct {
 
 	// 中间件检测
 	Middlewares []struct {
-		Type        string `yaml:"type"`   // mysql / redis / nacos
-		Query       string `yaml:"query"`  // 在线检测 PromQL（值=1在线，值=0离线）
-		OnlineValue int    `yaml:"online_value"` // 默认1表示在线；nacos为0
+		Type        string `yaml:"type"`         // mysql / redis / nacos
+		Query       string `yaml:"query"`        // 在线检测 PromQL（值=1在线，值=0离线）
+		OnlineValue *int   `yaml:"online_value"` // 指针类型：nil=未配置(默认1)，0=nacos离线值
 		// 附加指标
 		ExtraMetrics []struct {
 			Name  string `yaml:"name"`
@@ -107,7 +110,9 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 	// 异常退出时自动标记为 error
 	defer func() {
 		if report.Status == "pending" {
-			store.DB.Exec("UPDATE reports SET status = 'error' WHERE id = ?", reportID)
+			if _, err := store.DB.Exec("UPDATE reports SET status = 'error' WHERE id = ?", reportID); err != nil {
+				log.Printf("[Inspector] failed to mark report %d as error: %v", reportID, err)
+			}
 			report.Status = "error"
 		}
 	}()
@@ -269,7 +274,7 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 		go func() {
 			defer wg.Done()
 			q := i.renderQuery(cfg.Resources.CPUQuery, vars)
-			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, 300)
+			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
 			if err != nil {
 				log.Printf("[Inspector] CPU query failed: %v", err)
 				return
@@ -291,7 +296,7 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 		go func() {
 			defer wg.Done()
 			q := i.renderQuery(cfg.Resources.MemQuery, vars)
-			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, 300)
+			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
 			if err != nil {
 				log.Printf("[Inspector] Mem query failed: %v", err)
 				return
@@ -314,13 +319,13 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 		go func() {
 			defer wg.Done()
 			q := i.renderQuery(dq.Query, vars)
-			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, 300)
-			mu.Lock()
-			defer mu.Unlock()
+			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
 			if err != nil {
 				log.Printf("[Inspector] Disk[%s] query failed: %v", dq.Path, err)
 				return
 			}
+			mu.Lock()
+			defer mu.Unlock()
 			for _, p := range points {
 				inst := InstanceLabel(p.Labels)
 				e := ensureEntry(inst)
@@ -372,9 +377,10 @@ func (i *Inspector) queryMiddlewares(ctx context.Context, cfg *TemplateConfig, v
 
 			// 每个 instance 对应一条中间件状态
 			byInst := make(map[string]*model.MiddlewareStatus)
+			// nil 表示未配置，默认值为 1（在线）；配置了 0 时（如 nacos）以实际值为准
 			onlineVal := float64(1)
-			if mw.OnlineValue != 0 || mw.Type == "nacos" {
-				onlineVal = float64(mw.OnlineValue)
+			if mw.OnlineValue != nil {
+				onlineVal = float64(*mw.OnlineValue)
 			}
 
 			for _, p := range points {

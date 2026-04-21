@@ -3,7 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -78,9 +80,13 @@ func ListReports(c *gin.Context) {
 
 // GetReport 获取报告详情
 func GetReport(c *gin.Context) {
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
 	var r model.Report
-	err := store.DB.QueryRow(
+	err = store.DB.QueryRow(
 		"SELECT id, project_id, report_date, data, status, created_at FROM reports WHERE id = ?",
 		id,
 	).Scan(&r.ID, &r.ProjectID, &r.ReportDate, &r.Data, &r.Status, &r.CreatedAt)
@@ -93,7 +99,11 @@ func GetReport(c *gin.Context) {
 
 // GetReportMarkdown 获取 Markdown 格式报告
 func GetReportMarkdown(c *gin.Context) {
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
 
 	type reportWithProject struct {
 		model.Report
@@ -101,7 +111,7 @@ func GetReportMarkdown(c *gin.Context) {
 	}
 
 	var r reportWithProject
-	err := store.DB.QueryRow(
+	err = store.DB.QueryRow(
 		"SELECT r.id, r.project_id, r.report_date, r.data, r.status, p.name as project_name "+
 			"FROM reports r LEFT JOIN projects p ON r.project_id = p.id WHERE r.id = ?",
 		id,
@@ -117,11 +127,17 @@ func GetReportMarkdown(c *gin.Context) {
 		return
 	}
 
-	// 获取项目 group 变量
+	// 获取项目 group 变量（查询失败时降级为空值，报告仍可生成）
 	var variables string
-	store.DB.QueryRow("SELECT variables FROM projects WHERE id = ?", r.ProjectID).Scan(&variables)
+	if err := store.DB.QueryRow("SELECT variables FROM projects WHERE id = ?", r.ProjectID).Scan(&variables); err != nil {
+		log.Printf("[report] warn: failed to load project variables for project_id=%d: %v", r.ProjectID, err)
+	}
 	varsMap := make(map[string]string)
-	json.Unmarshal([]byte(variables), &varsMap) //nolint:errcheck
+	if variables != "" {
+		if err := json.Unmarshal([]byte(variables), &varsMap); err != nil {
+			log.Printf("[report] warn: failed to parse project variables for project_id=%d: %v", r.ProjectID, err)
+		}
+	}
 	group := varsMap["group"]
 
 	md := generateMarkdown(r.ProjectName, group, r.ReportDate, reportData)
@@ -139,6 +155,8 @@ func generateMarkdown(projectName, group, reportDate string, data model.ReportDa
 	// ── 一、服务器概览 ──────────────────────────────────────────
 	// 预先按 ident 建立磁盘数据索引（VM instance 可能带端口，取前缀匹配）
 	diskByIdent := buildDiskIndex(data.Resources)
+	// 收集所有出现的磁盘路径（有序），作为动态列头
+	diskPaths := collectDiskPaths(data.Resources)
 
 	sb.WriteString("## 一、服务器概览\n\n")
 	if len(data.Servers) == 0 {
@@ -152,8 +170,19 @@ func generateMarkdown(projectName, group, reportDate string, data model.ReportDa
 		}
 		sb.WriteString(fmt.Sprintf("**在线**: %d  **离线**: %d  **合计**: %d\n\n",
 			onlineCount, len(data.Servers)-onlineCount, len(data.Servers)))
-		sb.WriteString("| IP | 状态 | CPU核数 | CPU使用率 | 内存使用率 | 时间偏移 | 系统盘(/) | 数据盘(/data) |\n")
-		sb.WriteString("|-----|------|---------|-----------|------------|----------|-----------|---------------|\n")
+
+		// 动态生成表头（磁盘列根据实际配置路径生成）
+		sb.WriteString("| IP | 状态 | CPU核数 | CPU使用率 | 内存使用率 | 时间偏移")
+		for _, p := range diskPaths {
+			sb.WriteString(fmt.Sprintf(" | 磁盘(%s)", p))
+		}
+		sb.WriteString(" |\n")
+		sb.WriteString("|-----|------|---------|-----------|------------|----------")
+		for range diskPaths {
+			sb.WriteString("|----------")
+		}
+		sb.WriteString("|\n")
+
 		for _, s := range data.Servers {
 			status := "✅ 在线"
 			if !s.Online {
@@ -164,19 +193,18 @@ func generateMarkdown(projectName, group, reportDate string, data model.ReportDa
 			if s.Offset > 1000 || s.Offset < -1000 {
 				offsetStr = fmt.Sprintf("⚠️ %dms", s.Offset)
 			}
-			rootDisk, dataDisk := "N/A", "N/A"
-			if disks, ok := diskByIdent[s.Ident]; ok {
-				if v, ok := disks["/"]; ok {
-					rootDisk = fmt.Sprintf("%.1f%%", v)
+			sb.WriteString(fmt.Sprintf("| %s | %s | %d | %.1f%% | %.1f%% | %s",
+				s.Ident, status, s.CPUNum, s.CPUUtil, s.MemUtil, offsetStr))
+			for _, p := range diskPaths {
+				val := "N/A"
+				if disks, ok := diskByIdent[s.Ident]; ok {
+					if v, ok := disks[p]; ok {
+						val = fmt.Sprintf("%.1f%%", v)
+					}
 				}
-				if v, ok := disks["/data"]; ok {
-					dataDisk = fmt.Sprintf("%.1f%%", v)
-				}
+				sb.WriteString(fmt.Sprintf(" | %s", val))
 			}
-			sb.WriteString(fmt.Sprintf("| %s | %s | %d | %.1f%% | %.1f%% | %s | %s | %s |\n",
-				s.Ident, status, s.CPUNum,
-				s.CPUUtil, s.MemUtil,
-				offsetStr, rootDisk, dataDisk))
+			sb.WriteString(" |\n")
 		}
 		sb.WriteString("\n")
 	}
@@ -307,6 +335,22 @@ func buildDiskIndex(resources []model.ServerResource) map[string]map[string]floa
 		}
 	}
 	return idx
+}
+
+// collectDiskPaths 从 resources 中收集所有出现的磁盘路径（有序，去重）
+func collectDiskPaths(resources []model.ServerResource) []string {
+	seen := make(map[string]struct{})
+	var paths []string
+	for _, r := range resources {
+		for _, d := range r.Disks {
+			if _, exists := seen[d.Path]; !exists {
+				seen[d.Path] = struct{}{}
+				paths = append(paths, d.Path)
+			}
+		}
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 // collectMetricKeys 收集中间件列表中所有出现的 extra metric key（有序）

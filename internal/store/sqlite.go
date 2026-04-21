@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -18,6 +19,12 @@ func Init(dbPath string) error {
 	}
 	// SQLite 不支持真正的并发写，限制为单连接避免 "database is locked" 错误
 	DB.SetMaxOpenConns(1)
+	DB.SetMaxIdleConns(1)
+
+	// 验证数据库连接可用
+	if err := DB.Ping(); err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
 
 	// 创建表结构
 	if err := createTables(); err != nil {
