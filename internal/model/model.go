@@ -1,0 +1,94 @@
+package model
+
+import "time"
+
+// Template 巡检模板
+type Template struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Content   string    `json:"content"` // YAML 格式
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// Project 巡检项目
+type Project struct {
+	ID         int64     `json:"id"`
+	Name       string    `json:"name"`
+	TemplateID int64     `json:"template_id"`
+	Variables  string    `json:"variables"` // JSON: {"group": "kuvera-prod"}
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// Report 巡检报告
+type Report struct {
+	ID         int64     `json:"id"`
+	ProjectID  int64     `json:"project_id"`
+	ReportDate string    `json:"report_date"` // 2026-04-20
+	Data       string    `json:"data"`        // JSON: ReportData
+	Status     string    `json:"status"`      // pending / completed / error
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// ReportData 报告数据结构（4个区块）
+type ReportData struct {
+	Servers     []TargetInfo       `json:"servers"`
+	Resources   []ServerResource   `json:"resources"`
+	Middlewares []MiddlewareStatus `json:"middlewares"`
+	Containers  []ContainerSummary `json:"containers"`
+	Alerts      []AlertResult      `json:"alerts"`
+}
+
+// TargetInfo 服务器概览信息（来自 N9E targets API，区块一）
+type TargetInfo struct {
+	Ident        string  `json:"ident"`          // IP / 主机标识
+	HostIP       string  `json:"host_ip"`        // 宿主机 IP
+	OS           string  `json:"os"`             // 操作系统
+	CPUNum       int     `json:"cpu_num"`        // CPU 核数
+	CPUUtil      float64 `json:"cpu_util"`       // CPU 使用率 %
+	MemUtil      float64 `json:"mem_util"`       // 内存使用率 %
+	Offset       int64   `json:"offset"`         // 时间偏移 ms
+	Online       bool    `json:"online"`         // target_up >= 1
+	AgentVersion string  `json:"agent_version"`  // Agent 版本
+}
+
+// DiskUsage 磁盘分区使用情况
+type DiskUsage struct {
+	Path    string  `json:"path"`
+	Current float64 `json:"current"` // 当前使用率 %
+	Max     float64 `json:"max"`     // 时间窗口内最大值
+	NA      bool    `json:"na"`      // 分区不存在
+}
+
+// ServerResource 单台服务器资源使用率（区块二）
+type ServerResource struct {
+	Instance   string      `json:"instance"`
+	CPUCurrent float64     `json:"cpu_current"` // 当前 CPU 使用率 %
+	CPUMax     float64     `json:"cpu_max"`
+	MemCurrent float64     `json:"mem_current"` // 当前内存使用率 %
+	MemMax     float64     `json:"mem_max"`
+	Disks      []DiskUsage `json:"disks"`
+}
+
+// MiddlewareStatus 中间件状态（区块三）
+type MiddlewareStatus struct {
+	Instance string            `json:"instance"`
+	Type     string            `json:"type"`              // mysql / redis / nacos
+	Online   bool              `json:"online"`
+	Metrics  map[string]string `json:"metrics,omitempty"` // 关键指标 KV
+}
+
+// ContainerSummary 单台机器容器运行情况（区块四）
+type ContainerSummary struct {
+	Instance     string `json:"instance"`
+	RunningCount int    `json:"running_count"`
+}
+
+// AlertResult 告警事件
+type AlertResult struct {
+	RuleName    string `json:"rule_name"`
+	Severity    int    `json:"severity"`
+	IsRecovered bool   `json:"is_recovered"`
+	TargetIdent string `json:"target_ident"`
+	TriggerTime string `json:"trigger_time"`
+	Tags        string `json:"tags"`
+}
