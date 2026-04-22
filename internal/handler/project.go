@@ -104,6 +104,10 @@ func UpdateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
+	if p.Name == "" || p.TemplateID == 0 || p.Variables == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name、template_id 和 variables 为必填字段"})
+		return
+	}
 
 	_, err = store.DB.Exec(
 		"UPDATE projects SET name = ?, template_id = ?, variables = ? WHERE id = ?",
@@ -117,7 +121,7 @@ func UpdateProject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "updated"})
 }
 
-// DeleteProject 删除项目（事务保证原子性，外键 ON DELETE CASCADE 级联删除 reports）
+// DeleteProject 删除项目（依赖 SQLite 外键 ON DELETE CASCADE 自动级联删除 reports）
 func DeleteProject(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -125,23 +129,8 @@ func DeleteProject(c *gin.Context) {
 		return
 	}
 
-	tx, err := store.DB.Begin()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin transaction"})
-		return
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	if _, err = tx.Exec("DELETE FROM reports WHERE project_id = ?", id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete project reports"})
-		return
-	}
-	if _, err = tx.Exec("DELETE FROM projects WHERE id = ?", id); err != nil {
+	if _, err = store.DB.Exec("DELETE FROM projects WHERE id = ?", id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete project"})
-		return
-	}
-	if err = tx.Commit(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit transaction"})
 		return
 	}
 

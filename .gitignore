@@ -20,3 +20,5 @@ web/dist/
 .claude/
 .docs/
 .playwright/
+
+server

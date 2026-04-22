@@ -49,92 +49,57 @@ func (c *N9EClient) EnsureToken(ctx context.Context) error {
 }
 
 func (c *N9EClient) login(ctx context.Context) error {
-	// N9E 登录请求体
-	body := map[string]interface{}{
+	body, err := json.Marshal(map[string]any{
 		"username": c.username,
 		"password": c.password,
 		"is_ldap":  0,
-	}
-	jsonBody, _ := json.Marshal(body)
-
-	// 尝试多个可能的登录路径
-	paths := []string{
-		"/api/n9e/auth/login",
-		"/api/v1/auth/login",
-		"/api/rdb/auth/login",
+	})
+	if err != nil {
+		return fmt.Errorf("marshal login body failed: %w", err)
 	}
 
-	var lastErr error
-	for _, path := range paths {
-		url := c.endpoint + path
-		log.Printf("[N9E] trying login: %s", url)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonBody))
-		if err != nil {
-			lastErr = fmt.Errorf("N9E login build request failed: %w", err)
-			continue
-		}
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := c.client.Do(req)
-		if err != nil {
-			lastErr = fmt.Errorf("N9E login request failed: %w", err)
-			continue
-		}
+	url := c.endpoint + "/api/n9e/auth/login"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build N9E login request failed: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
 
-		// 读取响应体
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
-		resp.Body.Close()
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("N9E login request failed: %w", err)
+	}
+	defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("[N9E] login failed: status=%d, path=%s", resp.StatusCode, path)
-			lastErr = fmt.Errorf("N9E login returned status %d, path: %s", resp.StatusCode, path)
-			continue
-		}
-
-		// 尝试解析响应
-		var result map[string]interface{}
-		if err := json.Unmarshal(respBody, &result); err != nil {
-			lastErr = fmt.Errorf("failed to decode N9E login response: %w", err)
-			continue
-		}
-
-		// 检查错误字段 (可能是 err 或 error)
-		errField := ""
-		if v, ok := result["err"].(string); ok {
-			errField = v
-		} else if v, ok := result["error"].(string); ok {
-			errField = v
-		}
-
-		if errField != "" {
-			lastErr = fmt.Errorf("N9E login failed: %s, path: %s", errField, path)
-			continue
-		}
-
-		// 提取 token (可能是 access_token, token 等)
-		token := ""
-		if v, ok := result["access_token"].(string); ok {
-			token = v
-		} else if v, ok := result["token"].(string); ok {
-			token = v
-		} else if data, ok := result["dat"].(map[string]interface{}); ok {
-			if v, ok := data["access_token"].(string); ok {
-				token = v
-			} else if v, ok := data["token"].(string); ok {
-				token = v
-			}
-		}
-
-		if token == "" {
-			lastErr = fmt.Errorf("N9E login response missing token, path: %s, body: %s", path, string(respBody))
-			continue
-		}
-
-		c.token = token
-		c.tokenExp = time.Now().Add(24 * time.Hour)
-		return nil
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
+	if err != nil {
+		return fmt.Errorf("read N9E login response failed: %w", err)
 	}
 
-	return lastErr
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("N9E login returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Err string `json:"err"`
+		Dat struct {
+			AccessToken string `json:"access_token"`
+		} `json:"dat"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return fmt.Errorf("decode N9E login response failed: %w", err)
+	}
+	if result.Err != "" {
+		return fmt.Errorf("N9E login failed: %s", result.Err)
+	}
+	if result.Dat.AccessToken == "" {
+		return fmt.Errorf("N9E login response missing access_token")
+	}
+
+	c.token = result.Dat.AccessToken
+	c.tokenExp = time.Now().Add(24 * time.Hour)
+	log.Printf("[N9E] login success, token acquired")
+	return nil
 }
 
 // GetAlertEvents 获取告警事件列表
@@ -166,11 +131,10 @@ func (c *N9EClient) GetAlertEvents(ctx context.Context, stime, etime int64, grou
 		if err != nil {
 			return nil, fmt.Errorf("N9E request failed: %w", err)
 		}
-		// 确保每次迭代都关闭响应体，防止连接泄漏
 		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		resp.Body.Close()
 		if readErr != nil {
-			return nil, fmt.Errorf("failed to read N9E response body: %w", readErr)
+			return nil, fmt.Errorf("read N9E response body failed: %w", readErr)
 		}
 
 		if resp.StatusCode != http.StatusOK {
@@ -179,23 +143,20 @@ func (c *N9EClient) GetAlertEvents(ctx context.Context, stime, etime int64, grou
 
 		var result n9eAlertResponse
 		if err := json.Unmarshal(respBody, &result); err != nil {
-			return nil, fmt.Errorf("failed to decode N9E response: %w", err)
+			return nil, fmt.Errorf("decode N9E response failed: %w", err)
 		}
-
-		if result.Error != "" {
-			return nil, fmt.Errorf("N9E API error: %s", result.Error)
+		if result.Err != "" {
+			return nil, fmt.Errorf("N9E API error: %s", result.Err)
 		}
 
 		// 过滤并收集告警
 		for _, alert := range result.Data.List {
-			// 应用层过滤：检查 tags 是否包含 groupTag
 			if !containsGroupTag(alert.Tags, groupTag) {
 				continue
 			}
 			allAlerts = append(allAlerts, alert)
 		}
 
-		// 检查是否还有更多页
 		if page >= result.Data.TotalPage {
 			break
 		}
@@ -218,8 +179,8 @@ func containsGroupTag(tags, targetGroup string) bool {
 }
 
 type n9eAlertResponse struct {
-	Error string `json:"err"`
-	Data  struct {
+	Err  string `json:"err"`
+	Data struct {
 		TotalPage int                 `json:"totalPage"`
 		List      []model.AlertResult `json:"datas"`
 	} `json:"dat"`
@@ -252,7 +213,7 @@ func (c *N9EClient) GetTargets(ctx context.Context, group string) ([]model.Targe
 		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		resp.Body.Close()
 		if readErr != nil {
-			return nil, fmt.Errorf("failed to read N9E targets response: %w", readErr)
+			return nil, fmt.Errorf("read N9E targets response failed: %w", readErr)
 		}
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("N9E targets returned status %d: %s", resp.StatusCode, string(body))
@@ -260,10 +221,10 @@ func (c *N9EClient) GetTargets(ctx context.Context, group string) ([]model.Targe
 
 		var result n9eTargetsResponse
 		if err := json.Unmarshal(body, &result); err != nil {
-			return nil, fmt.Errorf("failed to decode N9E targets response: %w", err)
+			return nil, fmt.Errorf("decode N9E targets response failed: %w", err)
 		}
-		if result.Error != "" {
-			return nil, fmt.Errorf("N9E targets API error: %s", result.Error)
+		if result.Err != "" {
+			return nil, fmt.Errorf("N9E targets API error: %s", result.Err)
 		}
 
 		for _, t := range result.Data.List {
@@ -303,8 +264,8 @@ type n9eTarget struct {
 }
 
 type n9eTargetsResponse struct {
-	Error string `json:"err"`
-	Data  struct {
+	Err  string `json:"err"`
+	Data struct {
 		List  []n9eTarget `json:"list"`
 		Total int         `json:"total"`
 	} `json:"dat"`

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"dm-inspect/internal/model"
+	"dm-inspect/internal/service"
 	"dm-inspect/internal/store"
 
 	"github.com/goccy/go-yaml"
@@ -129,28 +130,8 @@ func ListPresets(c *gin.Context) {
 // validateTemplateContent 校验 YAML 内容能否被正确解析
 // 返回错误描述，nil 表示合法
 func validateTemplateContent(content string) error {
-	// 只做结构校验，确保 YAML 可解析且字段类型正确
-	type templateConfig struct {
-		Resources struct {
-			CPUQuery    string `yaml:"cpu_query"`
-			MemQuery    string `yaml:"mem_query"`
-			DiskQueries []struct {
-				Path  string `yaml:"path"`
-				Query string `yaml:"query"`
-			} `yaml:"disk_queries"`
-		} `yaml:"resources"`
-		Middlewares []struct {
-			Type         string `yaml:"type"`
-			Query        string `yaml:"query"`
-			OnlineValue  int    `yaml:"online_value"`
-			ExtraMetrics []struct {
-				Name  string `yaml:"name"`
-				Query string `yaml:"query"`
-			} `yaml:"extra_metrics"`
-		} `yaml:"middlewares"`
-		ContainerQuery string `yaml:"container_query"`
-	}
-	var cfg templateConfig
+	// 复用 service 层的 TemplateConfig 做结构校验，避免两处定义不一致
+	var cfg service.TemplateConfig
 	return yaml.Unmarshal([]byte(content), &cfg)
 }
 
@@ -233,11 +214,13 @@ func UpdateTemplate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	if t.Content != "" {
-		if err := validateTemplateContent(t.Content); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "YAML 格式错误: " + err.Error()})
-			return
-		}
+	if t.Name == "" || t.Content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name 和 content 为必填字段"})
+		return
+	}
+	if err := validateTemplateContent(t.Content); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "YAML 格式错误: " + err.Error()})
+		return
 	}
 
 	_, err := store.DB.Exec(

@@ -7,6 +7,7 @@ import (
 	"dm-inspect/internal/handler"
 	"dm-inspect/internal/middleware"
 	"dm-inspect/internal/router"
+	"dm-inspect/internal/service"
 	"dm-inspect/internal/store"
 
 	"github.com/gin-gonic/gin"
@@ -26,8 +27,9 @@ func main() {
 	}
 	defer store.Close()
 
-	// 初始化巡检引擎
-	handler.InitInspector(cfg.VMEndpoint, cfg.N9EEndpoint, cfg.N9EUser, cfg.N9EPass)
+	// 初始化巡检引擎并通过依赖注入注册到 handler
+	inspectorSvc := service.NewInspector(cfg.VMEndpoint, cfg.N9EEndpoint, cfg.N9EUser, cfg.N9EPass)
+	handler.SetInspector(inspectorSvc)
 
 	// 启动 Gin
 	gin.SetMode(gin.ReleaseMode)

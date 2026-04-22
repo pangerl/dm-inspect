@@ -179,7 +179,11 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 		if cfg.ContainerQuery == "" {
 			return
 		}
-		q := i.renderQuery(cfg.ContainerQuery, vars)
+				q, err := i.renderQuery(cfg.ContainerQuery, vars)
+				if err != nil {
+					addErr(fmt.Sprintf("render container query: %v", err))
+					return
+				}
 		points, err := i.vmClient.QueryInstant(ctx, q, etime)
 		if err != nil {
 			addErr(fmt.Sprintf("container query: %v", err))
@@ -273,7 +277,11 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			q := i.renderQuery(cfg.Resources.CPUQuery, vars)
+			q, err := i.renderQuery(cfg.Resources.CPUQuery, vars)
+			if err != nil {
+				log.Printf("[Inspector] render CPU query failed: %v", err)
+				return
+			}
 			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
 			if err != nil {
 				log.Printf("[Inspector] CPU query failed: %v", err)
@@ -295,7 +303,11 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			q := i.renderQuery(cfg.Resources.MemQuery, vars)
+			q, err := i.renderQuery(cfg.Resources.MemQuery, vars)
+			if err != nil {
+				log.Printf("[Inspector] render Mem query failed: %v", err)
+				return
+			}
 			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
 			if err != nil {
 				log.Printf("[Inspector] Mem query failed: %v", err)
@@ -318,7 +330,11 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			q := i.renderQuery(dq.Query, vars)
+			q, err := i.renderQuery(dq.Query, vars)
+			if err != nil {
+				log.Printf("[Inspector] render Disk[%s] query failed: %v", dq.Path, err)
+				return
+			}
 			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
 			if err != nil {
 				log.Printf("[Inspector] Disk[%s] query failed: %v", dq.Path, err)
@@ -368,7 +384,11 @@ func (i *Inspector) queryMiddlewares(ctx context.Context, cfg *TemplateConfig, v
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			q := i.renderQuery(mw.Query, vars)
+			q, err := i.renderQuery(mw.Query, vars)
+			if err != nil {
+				log.Printf("[Inspector] render middleware[%s] query failed: %v", mw.Type, err)
+				return
+			}
 			points, err := i.vmClient.QueryInstant(ctx, q, ts)
 			if err != nil {
 				log.Printf("[Inspector] middleware[%s] query failed: %v", mw.Type, err)
@@ -397,7 +417,11 @@ func (i *Inspector) queryMiddlewares(ctx context.Context, cfg *TemplateConfig, v
 
 			// 附加指标（在线的实例才查）
 			for _, em := range mw.ExtraMetrics {
-				eq := i.renderQuery(em.Query, vars)
+				eq, err := i.renderQuery(em.Query, vars)
+				if err != nil {
+					log.Printf("[Inspector] render middleware[%s] extra metric[%s] failed: %v", mw.Type, em.Name, err)
+					continue
+				}
 				eps, err := i.vmClient.QueryInstant(ctx, eq, ts)
 				if err != nil {
 					log.Printf("[Inspector] middleware[%s] extra metric[%s] failed: %v", mw.Type, em.Name, err)
@@ -438,13 +462,17 @@ func (i *Inspector) parseTemplateConfig(content string) (*TemplateConfig, error)
 	return &cfg, nil
 }
 
-func (i *Inspector) renderQuery(query string, vars map[string]string) string {
+func (i *Inspector) renderQuery(query string, vars map[string]string) (string, error) {
 	result := query
 	for key, value := range vars {
 		placeholder := fmt.Sprintf("{{.%s}}", key)
 		result = strings.ReplaceAll(result, placeholder, value)
 	}
-	return result
+	// 检测是否存在未定义的变量占位符
+	if strings.Contains(result, "{{.") {
+		return "", fmt.Errorf("query contains undefined variables after rendering: %s", result)
+	}
+	return result, nil
 }
 
 func (i *Inspector) calcTimeWindow(reportDate string) (int64, int64, error) {
@@ -501,12 +529,12 @@ func (i *Inspector) createReport(report *model.Report) (int64, error) {
 }
 
 func (i *Inspector) cleanupOldReports() {
-	cutoff := time.Now().AddDate(0, 0, -30).Format("2006-01-02")
-	_, err := store.DB.Exec("DELETE FROM reports WHERE report_date < ?", cutoff)
+	// 使用 SQLite date 函数进行日期比较，避免字符串格式潜在问题
+	_, err := store.DB.Exec("DELETE FROM reports WHERE report_date < date('now', '-30 days')")
 	if err != nil {
 		log.Printf("cleanup old reports failed: %v", err)
 	} else {
-		log.Printf("cleaned up reports older than %s", cutoff)
+		log.Printf("cleaned up reports older than 30 days")
 	}
 }
 

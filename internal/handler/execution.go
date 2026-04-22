@@ -11,15 +11,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 全局 inspector 实例（后续可改为依赖注入）
-var inspector *service.Inspector
+var (
+	inspectorSvc *service.Inspector
+	executionSem = make(chan struct{}, 3)
+)
 
-// executionSem 限制最多 3 个并发巡检，防止资源耗尽
-var executionSem = make(chan struct{}, 3)
+// SetInspector 注入巡检引擎实例（便于测试时 mock）
+func SetInspector(svc *service.Inspector) {
+	inspectorSvc = svc
+}
 
-// InitInspector 初始化巡检引擎
-func InitInspector(vmEndpoint, n9eEndpoint, n9eUser, n9ePass string) {
-	inspector = service.NewInspector(vmEndpoint, n9eEndpoint, n9eUser, n9ePass)
+// GetInspector 获取当前注入的巡检引擎实例（测试专用）
+func GetInspector() *service.Inspector {
+	return inspectorSvc
 }
 
 // ExecuteInspection 触发巡检执行
@@ -49,12 +53,17 @@ func ExecuteInspection(c *gin.Context) {
 	go func(projectID int64, reportDate string) {
 		// 获取信号量，限制最多 3 个并发巡检
 		executionSem <- struct{}{}
-		defer func() { <-executionSem }()
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[PANIC] inspection goroutine panic: projectID=%d, date=%s, err=%v", projectID, reportDate, r)
+			}
+			<-executionSem
+		}()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 
-		_, err := inspector.Execute(ctx, projectID, reportDate)
+		_, err := inspectorSvc.Execute(ctx, projectID, reportDate)
 		if err != nil {
 			log.Printf("[巡检失败] projectID=%d, date=%s, err=%v", projectID, reportDate, err)
 		}

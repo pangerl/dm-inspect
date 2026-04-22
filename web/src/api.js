@@ -1,14 +1,21 @@
 const BASE = '/api'
+const REQUEST_TIMEOUT = 10000 // 10秒超时
 
-async function request(path, options) {
-  const res = await fetch(BASE + path, options)
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || '请求失败')
+async function request(path, options = {}) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
+  try {
+    const res = await fetch(BASE + path, { ...options, signal: controller.signal })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }))
+      throw new Error(err.error || '请求失败')
+    }
+    const ct = res.headers.get('content-type') || ''
+    if (ct.includes('json')) return res.json()
+    return res.text()
+  } finally {
+    clearTimeout(timeoutId)
   }
-  const ct = res.headers.get('content-type') || ''
-  if (ct.includes('json')) return res.json()
-  return res.text()
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }

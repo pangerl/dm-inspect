@@ -22,6 +22,7 @@ export default function ReportList() {
   const [markdown, setMarkdown] = useState('')
   const [executingProject, setExecutingProject] = useState(false)
   const pollTimerRef = useRef(null)
+  const pendingCheckTimerRef = useRef(null)
 
   // 独立加载项目列表（修复：过滤器选项与报告列表解耦）
   useEffect(() => {
@@ -39,9 +40,10 @@ export default function ReportList() {
       })
       .catch(err => {
         toast.error(err.message)
-        return []
+        // 请求失败时不更新 reports，保留旧数据，让轮询继续尝试
+        throw err
       })
-  }, [filterProject])
+  }, [filterProject, toast])
 
   // filterProject 变化时：重新加载，并清掉旧的轮询
   useEffect(() => {
@@ -50,11 +52,11 @@ export default function ReportList() {
     return () => {
       clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
+      clearTimeout(pendingCheckTimerRef.current)
+      pendingCheckTimerRef.current = null
     }
   }, [fetchReports])
 
-  // reports 变化时：有 pending 就保持轮询，全部完成就停
-  // 这样无论通过何种方式（初始加载、手动触发）出现 pending 报告，都能自动开启轮询
   useEffect(() => {
     const hasPending = reports.some(r => r.status === 'pending')
     if (hasPending && !pollTimerRef.current) {
@@ -63,7 +65,14 @@ export default function ReportList() {
       clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
     }
-  }, [reports, fetchReports])
+    // 组件卸载或依赖变化时清理 interval
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current)
+        pollTimerRef.current = null
+      }
+    }
+  }, [fetchReports, reports])
 
   // 同步 filterProject 到 URL
   const handleFilterChange = (val) => {
@@ -102,8 +111,19 @@ export default function ReportList() {
       await api.post('/executions', { project_id: projectId })
       const proj = projectOptions.find(p => p.id === projectId)
       toast.success(`「${proj?.name || ''}」巡检已启动`)
-      // 立即拉取一次，pending 报告出现后轮询机制会自动接管
-      fetchReports()
+      // 后端是异步创建 pending 报告，立即拉取可能还查不到。
+      // 这里延迟 2 秒后拉取，若仍无 pending 则再尝试一次，确保轮询能启动。
+      const tryFetch = (delay) => {
+        pendingCheckTimerRef.current = setTimeout(() => {
+          fetchReports().then(data => {
+            const hasPending = (data || []).some(r => r.status === 'pending')
+            if (!hasPending && delay < 10000) {
+              tryFetch(delay + 3000)
+            }
+          })
+        }, delay)
+      }
+      tryFetch(2000)
     } catch (err) {
       toast.error(err.message)
     } finally {
