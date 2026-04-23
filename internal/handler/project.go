@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"database/sql"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -10,13 +12,36 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ListProjects 获取项目列表
+// latestReportInfo 项目最近巡检信息
+type latestReportInfo struct {
+	ReportDate   string `json:"report_date,omitempty"`
+	Status       string `json:"status,omitempty"`
+	Summary      string `json:"summary,omitempty"`
+	ErrorMessage string `json:"error_message,omitempty"`
+	FailedBlocks string `json:"failed_blocks,omitempty"`
+}
+
+// ListProjects 获取项目列表（含最近巡检概览）
 func ListProjects(c *gin.Context) {
 	rows, err := store.DB.Query(`
 		SELECT p.id, p.name, p.template_id, p.variables, p.created_at,
-		       t.name as template_name
+		       t.name as template_name,
+		       lr.report_date as latest_report_date,
+		       lr.status as latest_report_status,
+		       lr.summary as latest_report_summary,
+		       lr.error_message as latest_report_error_message,
+		       lr.failed_blocks as latest_report_failed_blocks
 		FROM projects p
 		LEFT JOIN templates t ON p.template_id = t.id
+		LEFT JOIN (
+			SELECT r1.project_id, r1.report_date, r1.status, r1.summary, r1.error_message, r1.failed_blocks
+			FROM reports r1
+			INNER JOIN (
+				SELECT project_id, MAX(id) as max_id
+				FROM reports
+				GROUP BY project_id
+			) r2 ON r1.project_id = r2.project_id AND r1.id = r2.max_id
+		) lr ON lr.project_id = p.id
 		ORDER BY p.id DESC
 	`)
 	if err != nil {
@@ -27,15 +52,29 @@ func ListProjects(c *gin.Context) {
 
 	type ProjectWithTemplate struct {
 		model.Project
-		TemplateName string `json:"template_name"`
+		TemplateName   string            `json:"template_name"`
+		LatestReport   *latestReportInfo `json:"latest_report,omitempty"`
 	}
 
 	var projects []ProjectWithTemplate
 	for rows.Next() {
 		var p ProjectWithTemplate
-		if err := rows.Scan(&p.ID, &p.Name, &p.TemplateID, &p.Variables, &p.CreatedAt, &p.TemplateName); err != nil {
+		var latestDate, latestStatus, latestSummary, latestErrorMessage, latestFailedBlocks sql.NullString
+		if err := rows.Scan(
+			&p.ID, &p.Name, &p.TemplateID, &p.Variables, &p.CreatedAt, &p.TemplateName,
+			&latestDate, &latestStatus, &latestSummary, &latestErrorMessage, &latestFailedBlocks,
+		); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan project"})
 			return
+		}
+		if latestDate.Valid {
+			p.LatestReport = &latestReportInfo{
+				ReportDate:   latestDate.String,
+				Status:       latestStatus.String,
+				Summary:      latestSummary.String,
+				ErrorMessage: latestErrorMessage.String,
+				FailedBlocks: latestFailedBlocks.String,
+			}
 		}
 		projects = append(projects, p)
 	}
@@ -45,6 +84,86 @@ func ListProjects(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, projects)
+}
+
+// QuickCreateProject 使用预设快速创建模板和项目
+func QuickCreateProject(c *gin.Context) {
+	var req struct {
+		PresetKey   string `json:"preset_key"`
+		ProjectName string `json:"project_name"`
+		Group       string `json:"group"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	if req.PresetKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "preset_key is required"})
+		return
+	}
+	if req.ProjectName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "project_name is required"})
+		return
+	}
+	if req.Group == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请填写巡检范围标签（group）"})
+		return
+	}
+
+	// 查找预设
+	var preset *presetTemplate
+	for idx := range presets {
+		if presets[idx].Key == req.PresetKey {
+			preset = &presets[idx]
+			break
+		}
+	}
+	if preset == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "预设模板不存在"})
+		return
+	}
+
+	// 事务：创建模板 + 创建项目
+	tx, err := store.DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin transaction"})
+		return
+	}
+	defer tx.Rollback()
+
+	tmplResult, err := tx.Exec(
+		"INSERT INTO templates (name, content) VALUES (?, ?)",
+		preset.Name, preset.Content,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template"})
+		return
+	}
+	templateID, _ := tmplResult.LastInsertId()
+
+	variables, _ := json.Marshal(map[string]string{"group": req.Group})
+	projResult, err := tx.Exec(
+		"INSERT INTO projects (name, template_id, variables) VALUES (?, ?, ?)",
+		req.ProjectName, templateID, string(variables),
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create project"})
+		return
+	}
+	projectID, _ := projResult.LastInsertId()
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit transaction"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"project_id":    projectID,
+		"template_id":   templateID,
+		"project_name":  req.ProjectName,
+		"template_name": preset.Name,
+		"variables":     map[string]string{"group": req.Group},
+	})
 }
 
 // CreateProject 创建项目

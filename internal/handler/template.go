@@ -14,10 +14,12 @@ import (
 
 // presetTemplate 预设模板定义
 type presetTemplate struct {
-	Key         string `json:"key"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Content     string `json:"content"`
+	Key         string   `json:"key"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Content     string   `json:"content"`
+	Tags        []string `json:"tags"`
+	Recommended bool     `json:"recommended"`
 }
 
 // presets 内置预设模板列表
@@ -26,6 +28,8 @@ var presets = []presetTemplate{
 		Key:         "standard_linux",
 		Name:        "标准 Linux 服务器",
 		Description: "适用于通用 Linux 服务器：CPU / 内存 / 系统盘 / 数据盘，无中间件",
+		Tags:        []string{"linux", "basic"},
+		Recommended: true,
 		Content: strings.TrimSpace(`
 # 资源使用率
 resources:
@@ -45,6 +49,8 @@ container_query: "count by(ident) (docker_container_status_started_at{container_
 		Key:         "linux_with_mysql_redis",
 		Name:        "Linux + MySQL + Redis",
 		Description: "标准服务器资源 + MySQL 和 Redis 在线状态及关键指标",
+		Tags:        []string{"linux", "mysql", "redis"},
+		Recommended: true,
 		Content: strings.TrimSpace(`
 # 资源使用率
 resources:
@@ -83,6 +89,8 @@ container_query: "count by(ident) (docker_container_status_started_at{container_
 		Key:         "linux_full_stack",
 		Name:        "Linux 全栈（MySQL + Redis + Nacos）",
 		Description: "标准资源 + MySQL / Redis / Nacos 三种中间件监控",
+		Tags:        []string{"linux", "mysql", "redis", "nacos"},
+		Recommended: false,
 		Content: strings.TrimSpace(`
 # 资源使用率
 resources:

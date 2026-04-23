@@ -22,6 +22,7 @@ func Setup(r *gin.Engine) {
 		// 项目管理
 		api.GET("/projects", handler.ListProjects)
 		api.POST("/projects", handler.CreateProject)
+		api.POST("/projects/quick-create", handler.QuickCreateProject)
 		api.GET("/projects/:id", handler.GetProject)
 		api.PUT("/projects/:id", handler.UpdateProject)
 		api.DELETE("/projects/:id", handler.DeleteProject)

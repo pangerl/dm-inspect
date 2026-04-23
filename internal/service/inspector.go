@@ -117,21 +117,32 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 		}
 	}()
 
-	// 6. 并发执行4个区块查询
+	// 6. 并发执行5个区块查询，收集结构化执行结果
 	var (
-		servers     []model.TargetInfo
-		resources   []model.ServerResource
-		middlewares []model.MiddlewareStatus
-		containers  []model.ContainerSummary
-		alerts      []model.AlertResult
-		mu          sync.Mutex
-		wg          sync.WaitGroup
-		queryErrs   []string
+		servers      []model.TargetInfo
+		resources    []model.ServerResource
+		middlewares  []model.MiddlewareStatus
+		containers   []model.ContainerSummary
+		alerts       []model.AlertResult
+		mu           sync.Mutex
+		wg           sync.WaitGroup
+		blockResults []model.BlockResult
+		warnings     []string
 	)
 
-	addErr := func(msg string) {
+	recordBlock := func(block, status, message string) {
 		mu.Lock()
-		queryErrs = append(queryErrs, msg)
+		blockResults = append(blockResults, model.BlockResult{
+			Block:   block,
+			Status:  status,
+			Message: message,
+		})
+		mu.Unlock()
+	}
+
+	addWarning := func(msg string) {
+		mu.Lock()
+		warnings = append(warnings, msg)
 		mu.Unlock()
 	}
 
@@ -143,33 +154,48 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 		defer wg.Done()
 		targets, err := i.n9eClient.GetTargets(ctx, group)
 		if err != nil {
-			addErr(fmt.Sprintf("get targets: %v", err))
+			recordBlock("servers", "failed", fmt.Sprintf("获取服务器列表失败: %v", err))
 			return
 		}
 		sort.Slice(targets, func(a, b int) bool { return targets[a].Ident < targets[b].Ident })
 		mu.Lock()
 		servers = targets
 		mu.Unlock()
+		recordBlock("servers", "success", "")
 	}()
 
 	// 区块二：资源使用率（并发查CPU/内存/多个磁盘分区）
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		res := i.queryResources(ctx, cfg, vars, stime, etime)
+		res, err := i.queryResources(ctx, cfg, vars, stime, etime)
 		mu.Lock()
 		resources = res
 		mu.Unlock()
+		if err != nil {
+			recordBlock("resources", "failed", err.Error())
+			return
+		}
+		recordBlock("resources", "success", "")
 	}()
 
 	// 区块三：中间件监控
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		mws := i.queryMiddlewares(ctx, cfg, vars, etime)
+		if len(cfg.Middlewares) == 0 {
+			recordBlock("middlewares", "skipped", "未配置中间件监控")
+			return
+		}
+		mws, err := i.queryMiddlewares(ctx, cfg, vars, etime)
 		mu.Lock()
 		middlewares = mws
 		mu.Unlock()
+		if err != nil {
+			recordBlock("middlewares", "failed", err.Error())
+			return
+		}
+		recordBlock("middlewares", "success", "")
 	}()
 
 	// 区块四：容器运行情况
@@ -177,16 +203,17 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 	go func() {
 		defer wg.Done()
 		if cfg.ContainerQuery == "" {
+			recordBlock("containers", "skipped", "container_query 未配置")
 			return
 		}
-				q, err := i.renderQuery(cfg.ContainerQuery, vars)
-				if err != nil {
-					addErr(fmt.Sprintf("render container query: %v", err))
-					return
-				}
+		q, err := i.renderQuery(cfg.ContainerQuery, vars)
+		if err != nil {
+			recordBlock("containers", "failed", fmt.Sprintf("渲染查询失败: %v", err))
+			return
+		}
 		points, err := i.vmClient.QueryInstant(ctx, q, etime)
 		if err != nil {
-			addErr(fmt.Sprintf("container query: %v", err))
+			recordBlock("containers", "failed", fmt.Sprintf("容器查询失败: %v", err))
 			return
 		}
 		mu.Lock()
@@ -199,27 +226,25 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 		}
 		sort.Slice(containers, func(a, b int) bool { return containers[a].Instance < containers[b].Instance })
 		mu.Unlock()
+		recordBlock("containers", "success", "")
 	}()
 
-	// 告警查询（非阻塞，失败不影响主流程）
+	// 区块五：告警查询（失败降级为空，记录 warning）
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		res, err := i.n9eClient.GetAlertEvents(ctx, stime, etime, group)
 		if err != nil {
-			log.Printf("[N9E] alert query failed: %v", err)
+			addWarning(fmt.Sprintf("告警数据获取失败: %v", err))
 			res = []model.AlertResult{}
 		}
 		mu.Lock()
 		alerts = res
 		mu.Unlock()
+		recordBlock("alerts", "success", "")
 	}()
 
 	wg.Wait()
-
-	if len(queryErrs) > 0 {
-		log.Printf("[Inspector] query errors: %s", strings.Join(queryErrs, "; "))
-	}
 
 	// 7. 汇总并序列化报告数据
 	reportData := model.ReportData{
@@ -235,26 +260,66 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 		return nil, fmt.Errorf("failed to marshal report data: %w", err)
 	}
 
-	// 8. 更新报告为 completed
-	_, err = store.DB.Exec(
-		"UPDATE reports SET data = ?, status = 'completed' WHERE id = ?",
-		string(dataJSON), reportID,
-	)
-	if err != nil {
+	// 8. 生成摘要、重点关注和建议
+	summary := BuildSummary(reportData)
+	summaryJSON, _ := json.Marshal(summary)
+
+	highlights := BuildHighlights(reportData)
+	highlightsJSON, _ := json.Marshal(highlights)
+
+	suggestions := BuildSuggestions(summary)
+	suggestionsJSON, _ := json.Marshal(suggestions)
+
+	// 9. 计算最终状态
+	failedBlocksList := []string{}
+	for _, br := range blockResults {
+		if br.Status == "failed" {
+			failedBlocksList = append(failedBlocksList, br.Block)
+		}
+	}
+
+	finalStatus := "completed"
+	if len(failedBlocksList) > 0 {
+		finalStatus = "partial"
+	}
+
+	blockResultsJSON, _ := json.Marshal(blockResults)
+	warningsJSON, _ := json.Marshal(warnings)
+	failedBlocksJSON, _ := json.Marshal(failedBlocksList)
+
+	// 10. 组装报告对象
+	report.Data = string(dataJSON)
+	report.Status = finalStatus
+	report.FailedBlocks = string(failedBlocksJSON)
+	report.Warnings = string(warningsJSON)
+	report.Summary = string(summaryJSON)
+	report.BlockResults = string(blockResultsJSON)
+	report.Highlights = string(highlightsJSON)
+	report.Suggestions = string(suggestionsJSON)
+
+	// 主错误信息：取第一个失败的区块信息
+	if len(failedBlocksList) > 0 {
+		for _, br := range blockResults {
+			if br.Status == "failed" && br.Message != "" {
+				report.ErrorMessage = br.Message
+				break
+			}
+		}
+	}
+
+	// 11. 更新报告到数据库
+	if err := i.updateReport(report); err != nil {
 		return nil, fmt.Errorf("failed to update report: %w", err)
 	}
 
-	report.Data = string(dataJSON)
-	report.Status = "completed"
-
-	// 9. 异步清理 30 天前的旧报告
+	// 12. 异步清理 30 天前的旧报告
 	go i.cleanupOldReports()
 
 	return report, nil
 }
 
-// queryResources 并发采集各机器的 CPU/内存/磁盘数据
-func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, vars map[string]string, stime, etime int64) []model.ServerResource {
+// queryResources 并发采集各机器的 CPU/内存/磁盘数据，返回采集结果及可能发生的错误
+func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, vars map[string]string, stime, etime int64) ([]model.ServerResource, error) {
 	// 以 instance 为 key 汇聚各指标数据
 	type entry struct {
 		cpuCurrent, cpuMax float64
@@ -264,6 +329,15 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 	byInstance := make(map[string]*entry)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+
+	// 错误收集
+	var errs []string
+	var errMu sync.Mutex
+	addErr := func(msg string) {
+		errMu.Lock()
+		errs = append(errs, msg)
+		errMu.Unlock()
+	}
 
 	ensureEntry := func(inst string) *entry {
 		if byInstance[inst] == nil {
@@ -279,12 +353,12 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 			defer wg.Done()
 			q, err := i.renderQuery(cfg.Resources.CPUQuery, vars)
 			if err != nil {
-				log.Printf("[Inspector] render CPU query failed: %v", err)
+				addErr(fmt.Sprintf("CPU查询渲染失败: %v", err))
 				return
 			}
 			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
 			if err != nil {
-				log.Printf("[Inspector] CPU query failed: %v", err)
+				addErr(fmt.Sprintf("CPU查询失败: %v", err))
 				return
 			}
 			mu.Lock()
@@ -305,12 +379,12 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 			defer wg.Done()
 			q, err := i.renderQuery(cfg.Resources.MemQuery, vars)
 			if err != nil {
-				log.Printf("[Inspector] render Mem query failed: %v", err)
+				addErr(fmt.Sprintf("内存查询渲染失败: %v", err))
 				return
 			}
 			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
 			if err != nil {
-				log.Printf("[Inspector] Mem query failed: %v", err)
+				addErr(fmt.Sprintf("内存查询失败: %v", err))
 				return
 			}
 			mu.Lock()
@@ -332,12 +406,12 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 			defer wg.Done()
 			q, err := i.renderQuery(dq.Query, vars)
 			if err != nil {
-				log.Printf("[Inspector] render Disk[%s] query failed: %v", dq.Path, err)
+				addErr(fmt.Sprintf("磁盘[%s]查询渲染失败: %v", dq.Path, err))
 				return
 			}
 			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
 			if err != nil {
-				log.Printf("[Inspector] Disk[%s] query failed: %v", dq.Path, err)
+				addErr(fmt.Sprintf("磁盘[%s]查询失败: %v", dq.Path, err))
 				return
 			}
 			mu.Lock()
@@ -370,14 +444,27 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 		})
 	}
 	sort.Slice(result, func(a, b int) bool { return result[a].Instance < result[b].Instance })
-	return result
+
+	if len(errs) > 0 {
+		return result, fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return result, nil
 }
 
-// queryMiddlewares 查询各中间件在线状态及关键指标
-func (i *Inspector) queryMiddlewares(ctx context.Context, cfg *TemplateConfig, vars map[string]string, ts int64) []model.MiddlewareStatus {
+// queryMiddlewares 查询各中间件在线状态及关键指标，返回查询结果及可能发生的错误
+func (i *Inspector) queryMiddlewares(ctx context.Context, cfg *TemplateConfig, vars map[string]string, ts int64) ([]model.MiddlewareStatus, error) {
 	var result []model.MiddlewareStatus
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+
+	// 错误收集
+	var errs []string
+	var errMu sync.Mutex
+	addErr := func(msg string) {
+		errMu.Lock()
+		errs = append(errs, msg)
+		errMu.Unlock()
+	}
 
 	for _, mw := range cfg.Middlewares {
 		mw := mw
@@ -386,12 +473,12 @@ func (i *Inspector) queryMiddlewares(ctx context.Context, cfg *TemplateConfig, v
 			defer wg.Done()
 			q, err := i.renderQuery(mw.Query, vars)
 			if err != nil {
-				log.Printf("[Inspector] render middleware[%s] query failed: %v", mw.Type, err)
+				addErr(fmt.Sprintf("%s查询渲染失败: %v", mw.Type, err))
 				return
 			}
 			points, err := i.vmClient.QueryInstant(ctx, q, ts)
 			if err != nil {
-				log.Printf("[Inspector] middleware[%s] query failed: %v", mw.Type, err)
+				addErr(fmt.Sprintf("%s查询失败: %v", mw.Type, err))
 				return
 			}
 
@@ -450,7 +537,11 @@ func (i *Inspector) queryMiddlewares(ctx context.Context, cfg *TemplateConfig, v
 		}
 		return result[a].Instance < result[b].Instance
 	})
-	return result
+
+	if len(errs) > 0 {
+		return result, fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return result, nil
 }
 
 // parseTemplateConfig 解析 YAML 模板配置
@@ -528,6 +619,23 @@ func (i *Inspector) createReport(report *model.Report) (int64, error) {
 	return result.LastInsertId()
 }
 
+// updateReport 更新报告的完整字段（含 v3 新增字段）
+func (i *Inspector) updateReport(report *model.Report) error {
+	_, err := store.DB.Exec(`
+		UPDATE reports SET
+			data = ?,
+			status = ?,
+			error_message = ?,
+			failed_blocks = ?,
+			warnings = ?,
+			summary = ?,
+			block_results = ?
+		WHERE id = ?
+	`, report.Data, report.Status, report.ErrorMessage, report.FailedBlocks,
+		report.Warnings, report.Summary, report.BlockResults, report.ID)
+	return err
+}
+
 func (i *Inspector) cleanupOldReports() {
 	// 使用 SQLite date 函数进行日期比较，避免字符串格式潜在问题
 	_, err := store.DB.Exec("DELETE FROM reports WHERE report_date < date('now', '-30 days')")
@@ -552,4 +660,141 @@ func (i *Inspector) GetProjectReport(projectID int64, reportDate string) (*model
 		return nil, err
 	}
 	return &r, nil
+}
+
+// BuildSummary 从报告数据生成摘要统计（包级函数，供 handler 复用）
+func BuildSummary(data model.ReportData) *model.Summary {
+	s := &model.Summary{}
+	for _, srv := range data.Servers {
+		if !srv.Online {
+			s.OfflineServers++
+		}
+		if srv.Offset > 30000 || srv.Offset < -30000 {
+			s.ClockOffsetIssues++
+		}
+	}
+	diskCriticalSet := make(map[string]bool)
+	for _, res := range data.Resources {
+		for _, d := range res.Disks {
+			if d.Current >= 80 {
+				diskCriticalSet[res.Instance] = true
+			}
+		}
+	}
+	s.DiskCritical = len(diskCriticalSet)
+	for _, mw := range data.Middlewares {
+		if !mw.Online {
+			s.MiddlewareAbnormal++
+		}
+	}
+	for _, a := range data.Alerts {
+		switch a.Severity {
+		case 1:
+			s.AlertS1++
+		case 2:
+			s.AlertS2++
+		case 3:
+			s.AlertS3++
+		}
+	}
+	return s
+}
+
+// BuildHighlights 从报告数据生成重点关注项（按优先级排序，包级函数，供 handler 复用）
+func BuildHighlights(data model.ReportData) []model.Highlight {
+	highlights := make([]model.Highlight, 0)
+
+	// 1. 离线服务器（最高优先级）
+	for _, srv := range data.Servers {
+		if !srv.Online {
+			highlights = append(highlights, model.Highlight{
+				Level:    "critical",
+				Category: "server",
+				Title:    fmt.Sprintf("%s 离线", srv.Ident),
+				Detail:   "服务器在 N9E 中标记为离线",
+			})
+		}
+	}
+
+	// 2. 磁盘风险
+	diskIssues := make(map[string][]string)
+	for _, res := range data.Resources {
+		for _, d := range res.Disks {
+			if d.Current >= 80 {
+				ip := res.Instance
+				if idx := strings.Index(ip, ":"); idx != -1 {
+					ip = ip[:idx]
+				}
+				diskIssues[ip] = append(diskIssues[ip], fmt.Sprintf("%s %.1f%%", d.Path, d.Current))
+			}
+		}
+	}
+	for ip, issues := range diskIssues {
+		highlights = append(highlights, model.Highlight{
+			Level:    "warning",
+			Category: "disk",
+			Title:    fmt.Sprintf("%s 磁盘使用率过高", ip),
+			Detail:   strings.Join(issues, ", "),
+		})
+	}
+
+	// 3. 时间偏移异常
+	for _, srv := range data.Servers {
+		if srv.Offset > 30000 || srv.Offset < -30000 {
+			highlights = append(highlights, model.Highlight{
+				Level:    "warning",
+				Category: "server",
+				Title:    fmt.Sprintf("%s 时间偏移异常", srv.Ident),
+				Detail:   fmt.Sprintf("偏移 %dms", srv.Offset),
+			})
+		}
+	}
+
+	// 4. 中间件离线
+	for _, mw := range data.Middlewares {
+		if !mw.Online {
+			highlights = append(highlights, model.Highlight{
+				Level:    "critical",
+				Category: "middleware",
+				Title:    fmt.Sprintf("%s %s 离线", mw.Instance, mw.Type),
+				Detail:   "中间件在线检测失败",
+			})
+		}
+	}
+
+	// 5. 高等级未恢复告警
+	for _, a := range data.Alerts {
+		if !a.IsRecovered && a.Severity <= 2 {
+			level := "warning"
+			if a.Severity == 1 {
+				level = "critical"
+			}
+			highlights = append(highlights, model.Highlight{
+				Level:    level,
+				Category: "alert",
+				Title:    fmt.Sprintf("%s 触发 %s", a.TargetIdent, a.RuleName),
+				Detail:   fmt.Sprintf("S%d 告警，未恢复", a.Severity),
+			})
+		}
+	}
+
+	return highlights
+}
+
+// BuildSuggestions 基于摘要生成建议动作（包级函数，供 handler 复用）
+func BuildSuggestions(s *model.Summary) []string {
+	suggestions := make([]string, 0)
+	if s.OfflineServers > 0 {
+		suggestions = append(suggestions, fmt.Sprintf("有 %d 台服务器离线，建议检查网络连通性和 Agent 运行状态", s.OfflineServers))
+	}
+	if s.DiskCritical > 0 {
+		suggestions = append(suggestions, fmt.Sprintf("有 %d 台服务器磁盘使用率超过 80%%，建议及时清理或扩容", s.DiskCritical))
+	}
+	if s.MiddlewareAbnormal > 0 {
+		suggestions = append(suggestions, fmt.Sprintf("有 %d 个中间件实例异常，建议检查服务状态和依赖资源", s.MiddlewareAbnormal))
+	}
+	if s.AlertS1 > 0 || s.AlertS2 > 0 {
+		suggestions = append(suggestions, fmt.Sprintf("存在 S1/S2 级别告警 %d 条，建议优先排查根因", s.AlertS1+s.AlertS2))
+	}
+	return suggestions
 }

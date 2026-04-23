@@ -21,12 +21,20 @@ type Project struct {
 
 // Report 巡检报告
 type Report struct {
-	ID         int64     `json:"id"`
-	ProjectID  int64     `json:"project_id"`
-	ReportDate string    `json:"report_date"` // 2026-04-20
-	Data       string    `json:"data"`        // JSON: ReportData
-	Status     string    `json:"status"`      // pending / completed / error
-	CreatedAt  time.Time `json:"created_at"`
+	ID            int64     `json:"id"`
+	ProjectID     int64     `json:"project_id"`
+	ProjectName   string    `json:"project_name,omitempty"` // 列表查询时 join 填充
+	ReportDate    string    `json:"report_date"`            // 2026-04-20
+	Data          string    `json:"data"`                   // JSON: ReportData
+	Status        string    `json:"status"`                 // pending / completed / partial / error
+	ErrorMessage  string    `json:"error_message"`
+	FailedBlocks  string    `json:"failed_blocks"`          // JSON: []string
+	Warnings      string    `json:"warnings"`               // JSON: []string
+	Summary       string    `json:"summary"`                // JSON: Summary
+	BlockResults  string    `json:"block_results"`          // JSON: []BlockResult
+	Highlights    string    `json:"highlights,omitempty"`   // JSON: []Highlight，运行时组装
+	Suggestions   string    `json:"suggestions,omitempty"`  // JSON: []string，运行时组装
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // ReportData 报告数据结构（4个区块）
@@ -91,4 +99,30 @@ type AlertResult struct {
 	TargetIdent string `json:"target_ident"`
 	TriggerTime string `json:"trigger_time"`
 	Tags        string `json:"tags"`
+}
+
+// BlockResult 单个区块的执行结果
+type BlockResult struct {
+	Block  string `json:"block"`  // servers / resources / middlewares / containers / alerts
+	Status string `json:"status"` // success / failed / skipped
+	Message string `json:"message"`
+}
+
+// Summary 报告摘要统计
+type Summary struct {
+	OfflineServers      int `json:"offline_servers"`
+	ClockOffsetIssues   int `json:"clock_offset_issues"`
+	DiskCritical        int `json:"disk_critical"`
+	MiddlewareAbnormal  int `json:"middleware_abnormal"`
+	AlertS1             int `json:"alert_s1"`
+	AlertS2             int `json:"alert_s2"`
+	AlertS3             int `json:"alert_s3"`
+}
+
+// Highlight 重点关注项
+type Highlight struct {
+	Level       string `json:"level"`       // critical / warning / info
+	Category    string `json:"category"`    // server / disk / middleware / alert
+	Title       string `json:"title"`       // 展示文案
+	Detail      string `json:"detail"`      // 详细说明
 }

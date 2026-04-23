@@ -2,12 +2,13 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react
 import { ToastProvider } from './components/Toast'
 import ProjectEdit from './pages/ProjectEdit'
 import ProjectList from './pages/ProjectList'
+import ProjectQuickCreate from './pages/ProjectQuickCreate'
 import ReportList from './pages/ReportList'
 import TemplateEdit from './pages/TemplateEdit'
 import TemplateList from './pages/TemplateList'
 
 const NAV_ITEMS = [
-  { path: '/projects',  label: '项目管理' },
+  { path: '/projects',  label: '巡检项目' },
   { path: '/templates', label: '模板管理' },
   { path: '/reports',   label: '巡检报告' },
 ]
@@ -57,6 +58,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/projects" replace />} />
               <Route path="/projects" element={<ProjectList />} />
+              <Route path="/projects/quick-new" element={<ProjectQuickCreate />} />
               <Route path="/projects/new" element={<ProjectEdit />} />
               <Route path="/projects/:id/edit" element={<ProjectEdit />} />
               <Route path="/templates" element={<TemplateList />} />

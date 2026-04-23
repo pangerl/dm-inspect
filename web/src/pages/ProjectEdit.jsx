@@ -66,7 +66,7 @@ export default function ProjectEdit() {
     <div className="max-w-lg">
       {/* 面包屑 */}
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link to="/projects" className="hover:text-gray-700">项目管理</Link>
+        <Link to="/projects" className="hover:text-gray-700">巡检项目</Link>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
@@ -114,7 +114,7 @@ export default function ProjectEdit() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Group 标签值
+              巡检范围标签（group）
               <span className="text-red-500 ml-0.5">*</span>
             </label>
             <input
@@ -126,7 +126,7 @@ export default function ProjectEdit() {
               required
             />
             <p className="mt-1.5 text-xs text-gray-400">
-              需与夜莺 (N9E) 中的自定义标签 group 保持一致，用于数据隔离
+              这个值必须与 Nightingale 中机器的 group 标签完全一致，用于数据隔离
             </p>
           </div>
         </div>

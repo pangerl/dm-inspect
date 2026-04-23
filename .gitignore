@@ -20,5 +20,6 @@ web/dist/
 .claude/
 .docs/
 .playwright/
+.agents
 
 server

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dm-inspect/internal/model"
+	"dm-inspect/internal/service"
 	"dm-inspect/internal/store"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,7 @@ import (
 func ListReports(c *gin.Context) {
 	projectID := c.Query("project_id")
 	date := c.Query("date")
+	status := c.Query("status")
 
 	// 参数验证：project_id 必须为有效整数
 	if projectID != "" {
@@ -31,6 +33,7 @@ func ListReports(c *gin.Context) {
 
 	query := `
 		SELECT r.id, r.project_id, r.report_date, r.data, r.status, r.created_at,
+		       r.error_message, r.failed_blocks, r.warnings, r.summary,
 		       p.name as project_name
 		FROM reports r
 		LEFT JOIN projects p ON r.project_id = p.id
@@ -45,6 +48,10 @@ func ListReports(c *gin.Context) {
 	if date != "" {
 		query += " AND r.report_date = ?"
 		args = append(args, date)
+	}
+	if status != "" {
+		query += " AND r.status = ?"
+		args = append(args, status)
 	}
 
 	query += " ORDER BY r.id DESC"
@@ -64,7 +71,11 @@ func ListReports(c *gin.Context) {
 	var reports []ReportWithProject
 	for rows.Next() {
 		var r ReportWithProject
-		if err := rows.Scan(&r.ID, &r.ProjectID, &r.ReportDate, &r.Data, &r.Status, &r.CreatedAt, &r.ProjectName); err != nil {
+		if err := rows.Scan(
+			&r.ID, &r.ProjectID, &r.ReportDate, &r.Data, &r.Status, &r.CreatedAt,
+			&r.ErrorMessage, &r.FailedBlocks, &r.Warnings, &r.Summary,
+			&r.ProjectName,
+		); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan report"})
 			return
 		}
@@ -78,26 +89,52 @@ func ListReports(c *gin.Context) {
 	c.JSON(http.StatusOK, reports)
 }
 
-// GetReport 获取报告详情
+// GetReport 获取报告详情（含运行时组装的重点关注和建议）
 func GetReport(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	var r model.Report
-	err = store.DB.QueryRow(
-		"SELECT id, project_id, report_date, data, status, created_at FROM reports WHERE id = ?",
-		id,
-	).Scan(&r.ID, &r.ProjectID, &r.ReportDate, &r.Data, &r.Status, &r.CreatedAt)
+
+	type ReportWithProject struct {
+		model.Report
+		ProjectName string `json:"project_name"`
+	}
+	var r ReportWithProject
+	err = store.DB.QueryRow(`
+		SELECT r.id, r.project_id, r.report_date, r.data, r.status, r.created_at,
+		       r.error_message, r.failed_blocks, r.warnings, r.summary, r.block_results,
+		       p.name as project_name
+		FROM reports r
+		LEFT JOIN projects p ON r.project_id = p.id
+		WHERE r.id = ?
+	`, id).Scan(
+		&r.ID, &r.ProjectID, &r.ReportDate, &r.Data, &r.Status, &r.CreatedAt,
+		&r.ErrorMessage, &r.FailedBlocks, &r.Warnings, &r.Summary, &r.BlockResults,
+		&r.ProjectName,
+	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
 		return
 	}
+
+	// 运行时组装 highlights 和 suggestions（基于 data 动态生成）
+	var reportData model.ReportData
+	if err := json.Unmarshal([]byte(r.Data), &reportData); err == nil {
+		summary := service.BuildSummary(reportData)
+		highlights := service.BuildHighlights(reportData)
+		suggestions := service.BuildSuggestions(summary)
+		highlightsJSON, _ := json.Marshal(highlights)
+		suggestionsJSON, _ := json.Marshal(suggestions)
+		r.Highlights = string(highlightsJSON)
+		r.Suggestions = string(suggestionsJSON)
+	}
+
 	c.JSON(http.StatusOK, r)
 }
 
-// GetReportMarkdown 获取 Markdown 格式报告
+// GetReportMarkdown 获取 Markdown 格式报告（顶部含执行状态和摘要）
 func GetReportMarkdown(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -111,11 +148,18 @@ func GetReportMarkdown(c *gin.Context) {
 	}
 
 	var r reportWithProject
-	err = store.DB.QueryRow(
-		"SELECT r.id, r.project_id, r.report_date, r.data, r.status, p.name as project_name "+
-			"FROM reports r LEFT JOIN projects p ON r.project_id = p.id WHERE r.id = ?",
-		id,
-	).Scan(&r.ID, &r.ProjectID, &r.ReportDate, &r.Data, &r.Status, &r.ProjectName)
+	err = store.DB.QueryRow(`
+		SELECT r.id, r.project_id, r.report_date, r.data, r.status, r.error_message,
+		       r.failed_blocks, r.warnings, r.summary, r.block_results,
+		       p.name as project_name
+		FROM reports r
+		LEFT JOIN projects p ON r.project_id = p.id
+		WHERE r.id = ?
+	`, id).Scan(
+		&r.ID, &r.ProjectID, &r.ReportDate, &r.Data, &r.Status, &r.ErrorMessage,
+		&r.FailedBlocks, &r.Warnings, &r.Summary, &r.BlockResults,
+		&r.ProjectName,
+	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
 		return
@@ -140,17 +184,64 @@ func GetReportMarkdown(c *gin.Context) {
 	}
 	group := varsMap["group"]
 
-	md := generateMarkdown(r.ProjectName, group, r.ReportDate, reportData)
+	md := generateMarkdown(r.ProjectName, group, r.ReportDate, r.Status, r.ErrorMessage, r.FailedBlocks, r.Warnings, r.Summary, r.BlockResults, reportData)
 	c.Header("Content-Type", "text/markdown; charset=utf-8")
 	c.String(http.StatusOK, md)
 }
 
-func generateMarkdown(projectName, group, reportDate string, data model.ReportData) string {
+func generateMarkdown(projectName, group, reportDate, status, errorMessage, failedBlocksJSON, warningsJSON, summaryJSON, blockResultsJSON string, data model.ReportData) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("# 巡检报告 - %s\n\n", projectName))
 	sb.WriteString(fmt.Sprintf("**巡检日期**: %s  \n", reportDate))
-	sb.WriteString(fmt.Sprintf("**巡检范围**: group=%s\n\n", group))
+	sb.WriteString(fmt.Sprintf("**巡检范围**: group=%s  \n", group))
+
+	// ── 执行状态与摘要 ──────────────────────────────────────────
+	statusLabel := map[string]string{"pending": "进行中", "completed": "已完成", "partial": "部分完成", "error": "失败"}
+	sb.WriteString(fmt.Sprintf("**执行状态**: %s\n\n", statusLabel[status]))
+
+	if status == "partial" || status == "error" {
+		if errorMessage != "" {
+			sb.WriteString(fmt.Sprintf("**错误信息**: %s\n\n", errorMessage))
+		}
+		var failedBlocks []string
+		json.Unmarshal([]byte(failedBlocksJSON), &failedBlocks)
+		if len(failedBlocks) > 0 {
+			sb.WriteString(fmt.Sprintf("**失败区块**: %s\n\n", strings.Join(failedBlocks, ", ")))
+		}
+	}
+
+	var warnings []string
+	json.Unmarshal([]byte(warningsJSON), &warnings)
+	if len(warnings) > 0 {
+		sb.WriteString("**警告**:\n")
+		for _, w := range warnings {
+			sb.WriteString(fmt.Sprintf("- %s\n", w))
+		}
+		sb.WriteString("\n")
+	}
+
+	var summary model.Summary
+	if err := json.Unmarshal([]byte(summaryJSON), &summary); err == nil {
+		sb.WriteString("**异常摘要**:\n")
+		sb.WriteString(fmt.Sprintf("- 离线服务器: %d\n", summary.OfflineServers))
+		sb.WriteString(fmt.Sprintf("- 时间偏移异常: %d\n", summary.ClockOffsetIssues))
+		sb.WriteString(fmt.Sprintf("- 磁盘风险: %d\n", summary.DiskCritical))
+		sb.WriteString(fmt.Sprintf("- 中间件异常: %d\n", summary.MiddlewareAbnormal))
+		sb.WriteString(fmt.Sprintf("- 告警 S1/S2/S3: %d/%d/%d\n", summary.AlertS1, summary.AlertS2, summary.AlertS3))
+		sb.WriteString("\n")
+	}
+
+	suggestions := service.BuildSuggestions(&summary)
+	if len(suggestions) > 0 {
+		sb.WriteString("**建议动作**:\n")
+		for _, s := range suggestions {
+			sb.WriteString(fmt.Sprintf("- %s\n", s))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("---\n\n")
 
 	// ── 一、服务器概览 ──────────────────────────────────────────
 	// 预先按 ident 建立磁盘数据索引（VM instance 可能带端口，取前缀匹配）

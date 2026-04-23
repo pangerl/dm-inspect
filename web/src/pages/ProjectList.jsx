@@ -1,9 +1,52 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import Badge from '../components/Badge'
 import EmptyState from '../components/EmptyState'
 import Spinner from '../components/Spinner'
 import { useToast } from '../components/Toast'
+
+// 从最近报告生成简短异常摘要，按状态优先级处理
+function formatSummary(lr) {
+  if (!lr) return '—'
+
+  // 1. error 状态优先显示错误信息
+  if (lr.status === 'error') {
+    return lr.error_message || '巡检执行失败'
+  }
+
+  // 2. partial 状态优先显示失败区块
+  if (lr.status === 'partial') {
+    try {
+      const failed = JSON.parse(lr.failed_blocks)
+      if (Array.isArray(failed) && failed.length > 0) {
+        return `${failed.join('、')} 查询失败`
+      }
+    } catch { /* ignore */ }
+    return '部分区块执行失败'
+  }
+
+  // 3. completed 状态显示 summary 归纳
+  if (!lr.summary || lr.summary === '') return '无异常'
+  try {
+    const s = JSON.parse(lr.summary)
+    const parts = []
+    if (s.offline_servers > 0) parts.push(`${s.offline_servers}台离线`)
+    if (s.disk_critical > 0) parts.push(`${s.disk_critical}项磁盘风险`)
+    if (s.middleware_abnormal > 0) parts.push(`${s.middleware_abnormal}个中间件异常`)
+    if (s.alert_s1 + s.alert_s2 > 0) parts.push(`S1/S2告警${s.alert_s1 + s.alert_s2}条`)
+    return parts.length > 0 ? parts.join('，') : '无异常'
+  } catch {
+    return '—'
+  }
+}
+
+// 获取昨天的日期字符串 YYYY-MM-DD
+function getYesterday() {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return d.toISOString().split('T')[0]
+}
 
 export default function ProjectList() {
   const toast = useToast()
@@ -12,6 +55,7 @@ export default function ProjectList() {
   const [loading, setLoading] = useState(true)
   const [confirmId, setConfirmId] = useState(null)
   const [executingId, setExecutingId] = useState(null)
+  const [execDates, setExecDates] = useState({}) // project_id -> date
 
   const fetchProjects = () =>
     api.get('/projects')
@@ -22,10 +66,11 @@ export default function ProjectList() {
   useEffect(() => { fetchProjects() }, [])
 
   const handleExecute = async (project) => {
+    const reportDate = execDates[project.id] || getYesterday()
     setExecutingId(project.id)
     try {
-      await api.post('/executions', { project_id: project.id })
-      toast.success(`「${project.name}」巡检已启动`)
+      await api.post('/executions', { project_id: project.id, report_date: reportDate })
+      toast.success(`「${project.name}」${reportDate} 巡检已启动`)
       navigate(`/reports?project_id=${project.id}`)
     } catch (err) {
       toast.error(err.message)
@@ -51,30 +96,45 @@ export default function ProjectList() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">项目管理</h1>
-          <p className="text-sm text-gray-500 mt-0.5">每个项目关联一个模板并配置变量，支持独立执行巡检</p>
+          <h1 className="text-xl font-semibold text-gray-900">巡检项目</h1>
+          <p className="text-sm text-gray-500 mt-0.5">管理巡检范围、执行巡检并查看最近结果</p>
         </div>
-        <Link
-          to="/projects/new"
-          className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          创建项目
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/projects/quick-new"
+            className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            使用预设快速创建
+          </Link>
+          <Link
+            to="/projects/new"
+            className="inline-flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            高级创建项目
+          </Link>
+        </div>
       </div>
 
       {projects.length === 0 ? (
         <EmptyState
-          title="暂无项目"
-          description="创建项目后即可执行巡检并生成报告"
+          title="还没有巡检项目"
+          description="推荐先用预设快速创建，3 分钟内完成首个巡检"
           action={
-            <Link to="/projects/new"
-              className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              创建第一个项目
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link to="/projects/quick-new"
+                className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                使用预设快速创建
+              </Link>
+              <Link to="/templates"
+                className="inline-flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                进入模板管理
+              </Link>
+            </div>
           }
         />
       ) : (
@@ -85,8 +145,10 @@ export default function ProjectList() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">项目名称</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">模板</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Group</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">创建时间</th>
-                <th className="px-4 py-3 w-48" />
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">最近巡检</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">最近状态</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">最近异常摘要</th>
+                <th className="px-4 py-3 w-56" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -94,6 +156,7 @@ export default function ProjectList() {
                 let vars = {}
                 try { vars = JSON.parse(p.variables) } catch {}
                 const isExecuting = executingId === p.id
+                const lr = p.latest_report
                 return (
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
@@ -103,26 +166,43 @@ export default function ProjectList() {
                         {vars.group || '—'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-400">
-                      {new Date(p.created_at).toLocaleString('zh-CN')}
+                    <td className="px-4 py-3 text-gray-500">
+                      {lr?.report_date || '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {lr?.status ? <Badge status={lr.status} /> : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 max-w-xs truncate" title={formatSummary(lr)}>
+                      {formatSummary(lr)}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleExecute(p)}
-                          disabled={isExecuting}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {isExecuting ? (
-                            <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          )}
-                          {isExecuting ? '启动中' : '执行巡检'}
-                        </button>
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="date"
+                              value={execDates[p.id] || getYesterday()}
+                              onChange={e => setExecDates(prev => ({ ...prev, [p.id]: e.target.value }))}
+                              className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <button
+                              onClick={() => handleExecute(p)}
+                              disabled={isExecuting}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                            >
+                              {isExecuting ? (
+                                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              )}
+                              {isExecuting ? '启动中' : '执行巡检'}
+                            </button>
+                          </div>
+                          <span className="text-[10px] text-gray-400">默认生成昨日巡检报告，可修改日期</span>
+                        </div>
                         <Link
                           to={`/projects/${p.id}/edit`}
                           className="inline-flex items-center gap-1 px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs font-medium transition-colors"

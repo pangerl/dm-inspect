@@ -71,6 +71,59 @@ func createTables() error {
 		}
 	}
 
+	// 执行 v3 版本字段迁移
+	if err := migrateReportsV3(); err != nil {
+		return fmt.Errorf("failed to migrate reports table: %w", err)
+	}
+
+	return nil
+}
+
+// migrateReportsV3 为 reports 表追加 v3 所需的字段
+func migrateReportsV3() error {
+	// 查询当前表已有列
+	rows, err := DB.Query("PRAGMA table_info(reports)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	existing := make(map[string]bool)
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull, pk int
+		var dfltValue interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		existing[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	// 按需追加新列
+	columns := []struct {
+		name string
+		sql  string
+	}{
+		{"error_message", "ALTER TABLE reports ADD COLUMN error_message TEXT DEFAULT ''"},
+		{"failed_blocks", "ALTER TABLE reports ADD COLUMN failed_blocks TEXT DEFAULT '[]'"},
+		{"warnings", "ALTER TABLE reports ADD COLUMN warnings TEXT DEFAULT '[]'"},
+		{"summary", "ALTER TABLE reports ADD COLUMN summary TEXT DEFAULT '{}'"},
+		{"block_results", "ALTER TABLE reports ADD COLUMN block_results TEXT DEFAULT '[]'"},
+	}
+
+	for _, col := range columns {
+		if !existing[col.name] {
+			if _, err := DB.Exec(col.sql); err != nil {
+				return fmt.Errorf("add column %s failed: %w", col.name, err)
+			}
+			log.Printf("[migrate] added column %s to reports", col.name)
+		}
+	}
+
 	return nil
 }
 

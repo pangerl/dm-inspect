@@ -1,5 +1,6 @@
 const CONFIG = {
   completed: { label: '已完成', cls: 'bg-green-100 text-green-800' },
+  partial:   { label: '部分完成', cls: 'bg-orange-100 text-orange-800' },
   error:     { label: '失败',   cls: 'bg-red-100 text-red-800' },
   pending:   { label: '进行中', cls: 'bg-yellow-100 text-yellow-800' },
 }
