@@ -363,12 +363,66 @@ func generateMarkdown(projectName, group, reportDate, status, errorMessage, fail
 			totalRunning += c.RunningCount
 		}
 		sb.WriteString(fmt.Sprintf("**运行中容器总数**: %d\n\n", totalRunning))
-		sb.WriteString("| 服务器 | 运行中容器数 |\n")
-		sb.WriteString("|--------|-------------|\n")
+
+		// 判断是否有服务详情
+		hasServices := false
 		for _, c := range data.Containers {
-			sb.WriteString(fmt.Sprintf("| %s | %d |\n", c.Instance, c.RunningCount))
+			if len(c.Services) > 0 {
+				hasServices = true
+				break
+			}
 		}
-		sb.WriteString("\n")
+
+		if hasServices {
+			for _, c := range data.Containers {
+				sb.WriteString(fmt.Sprintf("### %s（运行中 %d 个）\n\n", c.Instance, c.RunningCount))
+				if len(c.Services) == 0 {
+					sb.WriteString("无容器服务数据\n\n")
+					continue
+				}
+				sb.WriteString("| 容器名 | 镜像 | 状态 | 启动时间 | 端口状态 |\n")
+				sb.WriteString("|--------|------|------|----------|----------|\n")
+				for _, svc := range c.Services {
+					statusIcon := svc.Status
+					if svc.Status == "running" {
+						statusIcon = "✅ running"
+					} else if svc.Status == "exited" {
+						statusIcon = "❌ exited"
+					}
+					startedAt := "-"
+					if svc.StartedAt > 0 {
+						startedAt = time.Unix(svc.StartedAt, 0).Format("2006-01-02 15:04:05")
+					}
+					portStatus := "-"
+					if len(svc.Ports) > 0 {
+						var parts []string
+						for _, p := range svc.Ports {
+							icon := "❌"
+							if p.OK {
+								icon = "✅"
+							}
+							parts = append(parts, fmt.Sprintf("%s %s", p.Target, icon))
+						}
+						portStatus = strings.Join(parts, ", ")
+					}
+					image := svc.Image
+					if image == "" {
+						image = "-"
+					}
+					sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
+						svc.Name, image, statusIcon, startedAt, portStatus))
+				}
+				sb.WriteString("\n")
+			}
+		} else {
+			// 旧模板兼容：仅展示统计
+			sb.WriteString("| 服务器 | 运行中容器数 |\n")
+			sb.WriteString("|--------|-------------|\n")
+			for _, c := range data.Containers {
+				sb.WriteString(fmt.Sprintf("| %s | %d |\n", c.Instance, c.RunningCount))
+			}
+			sb.WriteString("\n")
+		}
 	}
 
 	// ── 四、告警信息 ────────────────────────────────────────────

@@ -154,6 +154,10 @@ func (c *VMClient) doQuery(ctx context.Context, vmURL string) (*vmQueryResponse,
 	if result.Status != "success" {
 		return nil, fmt.Errorf("VM query failed: %s", result.Error)
 	}
+	// log.Printf("[VM] response series count: %d", len(result.Data.Result))
+	// for i, s := range result.Data.Result {
+	// 	log.Printf("[VM] series %d labels: %v", i, s.Metric)
+	// }
 	return &result, nil
 }
 

@@ -57,7 +57,9 @@ type TemplateConfig struct {
 	} `yaml:"middlewares"`
 
 	// 容器运行情况
-	ContainerQuery string `yaml:"container_query"`
+	ContainerQuery         string `yaml:"container_query"`          // 保留：统计运行数量
+	ContainerServicesQuery string `yaml:"container_services_query"` // 新增：获取容器服务详情
+	ContainerPortsQuery    string `yaml:"container_ports_query"`    // 新增：获取端口连通状态
 }
 
 // Execute 执行巡检
@@ -91,6 +93,13 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 	stime, etime, err := i.calcTimeWindow(reportDate)
 	if err != nil {
 		return nil, fmt.Errorf("invalid report date: %w", err)
+	}
+
+	// 4.1 QueryInstant 查询使用当前可用时间戳（避免查询未来时间点导致 VM 返回空）
+	instantTs := etime
+	if now := time.Now().Unix(); now < etime {
+		instantTs = now
+		log.Printf("[Inspector] report_date=%s is today or future, using instantTs=%d instead of etime=%d", reportDate, instantTs, etime)
 	}
 
 	// 5. 在数据库中创建报告记录（pending 状态）
@@ -185,7 +194,7 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 			recordBlock("middlewares", "skipped", "未配置中间件监控")
 			return
 		}
-		mws, err := i.queryMiddlewares(ctx, cfg, vars, etime)
+		mws, err := i.queryMiddlewares(ctx, cfg, vars, instantTs)
 		mu.Lock()
 		middlewares = mws
 		mu.Unlock()
@@ -200,30 +209,121 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if cfg.ContainerQuery == "" {
-			recordBlock("containers", "skipped", "container_query 未配置")
+		hasAnyQuery := cfg.ContainerQuery != "" || cfg.ContainerServicesQuery != "" || cfg.ContainerPortsQuery != ""
+		if !hasAnyQuery {
+			recordBlock("containers", "skipped", "容器查询未配置")
 			return
 		}
-		q, err := i.renderQuery(cfg.ContainerQuery, vars)
-		if err != nil {
-			recordBlock("containers", "failed", fmt.Sprintf("渲染查询失败: %v", err))
-			return
+
+		var (
+			summaryMap map[string]int                                // ident -> running count
+			serviceMap map[string]map[string]*model.ContainerService // ident -> name -> service
+			portMap    map[string]map[string][]model.ContainerPort   // ident -> name -> ports
+			queryErrs  []string
+		)
+
+		// 1. 统计查询
+		if cfg.ContainerQuery != "" {
+			q, err := i.renderQuery(cfg.ContainerQuery, vars)
+			if err != nil {
+				queryErrs = append(queryErrs, fmt.Sprintf("渲染 container_query 失败: %v", err))
+			} else {
+				points, err := i.vmClient.QueryInstant(ctx, q, instantTs)
+				if err != nil {
+					queryErrs = append(queryErrs, fmt.Sprintf("container_query 查询失败: %v", err))
+				} else {
+					summaryMap = make(map[string]int)
+					for _, p := range points {
+						inst := InstanceLabel(p.Labels)
+						summaryMap[inst] = int(p.Value)
+					}
+				}
+			}
 		}
-		points, err := i.vmClient.QueryInstant(ctx, q, etime)
-		if err != nil {
-			recordBlock("containers", "failed", fmt.Sprintf("容器查询失败: %v", err))
-			return
+
+		// 2. 服务详情查询
+		if cfg.ContainerServicesQuery != "" {
+			q, err := i.renderQuery(cfg.ContainerServicesQuery, vars)
+			if err != nil {
+				queryErrs = append(queryErrs, fmt.Sprintf("渲染 container_services_query 失败: %v", err))
+			} else {
+				var err error
+				serviceMap, err = i.queryContainerServices(ctx, q, instantTs)
+				if err != nil {
+					queryErrs = append(queryErrs, fmt.Sprintf("container_services_query 查询失败: %v", err))
+				}
+			}
 		}
+
+		// 3. 端口状态查询
+		if cfg.ContainerPortsQuery != "" {
+			q, err := i.renderQuery(cfg.ContainerPortsQuery, vars)
+			if err != nil {
+				queryErrs = append(queryErrs, fmt.Sprintf("渲染 container_ports_query 失败: %v", err))
+			} else {
+				var err error
+				portMap, err = i.queryContainerPorts(ctx, q, instantTs)
+				if err != nil {
+					queryErrs = append(queryErrs, fmt.Sprintf("container_ports_query 查询失败: %v", err))
+				}
+			}
+		}
+
+		// 4. 关联端口到服务
+		if serviceMap != nil && portMap != nil {
+			for ident, services := range serviceMap {
+				if portsByName, ok := portMap[ident]; ok {
+					for name, svc := range services {
+						if ports, ok := portsByName[name]; ok {
+							svc.Ports = ports
+						}
+					}
+				}
+			}
+		}
+
+		// 5. 组装结果
+		allIdents := make(map[string]bool)
+		for inst := range summaryMap {
+			allIdents[inst] = true
+		}
+		for inst := range serviceMap {
+			allIdents[inst] = true
+		}
+
 		mu.Lock()
-		for _, p := range points {
-			inst := InstanceLabel(p.Labels)
-			containers = append(containers, model.ContainerSummary{
-				Instance:     inst,
-				RunningCount: int(p.Value),
-			})
+		for inst := range allIdents {
+			cs := model.ContainerSummary{
+				Instance: inst,
+			}
+			if v, ok := summaryMap[inst]; ok {
+				cs.RunningCount = v
+			}
+			if svcs, ok := serviceMap[inst]; ok {
+				for _, svc := range svcs {
+					cs.Services = append(cs.Services, *svc)
+				}
+				// 若未配置 container_query，从服务中统计 running 数量
+				if cfg.ContainerQuery == "" {
+					for _, svc := range svcs {
+						if svc.Status == "running" {
+							cs.RunningCount++
+						}
+					}
+				}
+			}
+			if len(cs.Services) > 0 {
+				sort.Slice(cs.Services, func(a, b int) bool { return cs.Services[a].Name < cs.Services[b].Name })
+			}
+			containers = append(containers, cs)
 		}
 		sort.Slice(containers, func(a, b int) bool { return containers[a].Instance < containers[b].Instance })
 		mu.Unlock()
+
+		if len(queryErrs) > 0 {
+			recordBlock("containers", "failed", strings.Join(queryErrs, "; "))
+			return
+		}
 		recordBlock("containers", "success", "")
 	}()
 
@@ -379,8 +479,8 @@ func (i *Inspector) queryDisks(ctx context.Context, cfg *TemplateConfig, vars ma
 	for inst, e := range byInstance {
 		sort.Slice(e.disks, func(a, b int) bool { return e.disks[a].Path < e.disks[b].Path })
 		result = append(result, model.ServerResource{
-			Instance:   inst,
-			Disks: e.disks,
+			Instance: inst,
+			Disks:    e.disks,
 		})
 	}
 	sort.Slice(result, func(a, b int) bool { return result[a].Instance < result[b].Instance })
@@ -481,6 +581,73 @@ func (i *Inspector) queryMiddlewares(ctx context.Context, cfg *TemplateConfig, v
 	if len(errs) > 0 {
 		return result, fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
+	return result, nil
+}
+
+// queryContainerServices 执行容器服务详情查询，返回 ident -> container_name -> ContainerService
+func (i *Inspector) queryContainerServices(ctx context.Context, query string, ts int64) (map[string]map[string]*model.ContainerService, error) {
+	points, err := i.vmClient.QueryInstant(ctx, query, ts)
+	if err != nil {
+		return nil, err
+	}
+	// log.Printf("[Inspector] queryContainerServices got %d points", len(points))
+	result := make(map[string]map[string]*model.ContainerService)
+	for _, p := range points {
+		inst := InstanceLabel(p.Labels)
+		name := p.Labels["container_name"]
+		if name == "" {
+			name = p.Labels["name"]
+		}
+		if name == "" {
+			name = p.Labels["container"]
+		}
+		if name == "" {
+			// log.Printf("[Inspector] skip container point: no container name in labels %v", p.Labels)
+			continue
+		}
+		if result[inst] == nil {
+			result[inst] = make(map[string]*model.ContainerService)
+		}
+		result[inst][name] = &model.ContainerService{
+			Name:      name,
+			Image:     p.Labels["container_image"],
+			Status:    p.Labels["container_status"],
+			StartedAt: int64(p.Value),
+		}
+	}
+	// log.Printf("[Inspector] queryContainerServices result: %d instances", len(result))
+	return result, nil
+}
+
+// queryContainerPorts 执行容器端口状态查询，返回 ident -> service -> []ContainerPort
+func (i *Inspector) queryContainerPorts(ctx context.Context, query string, ts int64) (map[string]map[string][]model.ContainerPort, error) {
+	points, err := i.vmClient.QueryInstant(ctx, query, ts)
+	if err != nil {
+		return nil, err
+	}
+	// log.Printf("[Inspector] queryContainerPorts got %d points", len(points))
+	result := make(map[string]map[string][]model.ContainerPort)
+	for _, p := range points {
+		inst := InstanceLabel(p.Labels)
+		svc := p.Labels["service"]
+		if svc == "" {
+			// log.Printf("[Inspector] skip port point: no service label in %v", p.Labels)
+			continue
+		}
+		target := p.Labels["target"]
+		if target == "" {
+			// log.Printf("[Inspector] skip port point: no target label in %v", p.Labels)
+			continue
+		}
+		if result[inst] == nil {
+			result[inst] = make(map[string][]model.ContainerPort)
+		}
+		result[inst][svc] = append(result[inst][svc], model.ContainerPort{
+			Target: target,
+			OK:     p.Value == 0,
+		})
+	}
+	// log.Printf("[Inspector] queryContainerPorts result: %d instances", len(result))
 	return result, nil
 }
 
@@ -616,7 +783,7 @@ func BuildSummary(data model.ReportData) *model.Summary {
 	diskCriticalSet := make(map[string]bool)
 	for _, res := range data.Resources {
 		for _, d := range res.Disks {
-			if d.Current >= 80 {
+			if d.Current >= 85 {
 				diskCriticalSet[res.Instance] = true
 			}
 		}
@@ -660,7 +827,7 @@ func BuildHighlights(data model.ReportData) []model.Highlight {
 	diskIssues := make(map[string][]string)
 	for _, res := range data.Resources {
 		for _, d := range res.Disks {
-			if d.Current >= 80 {
+			if d.Current >= 85 {
 				ip := res.Instance
 				if idx := strings.Index(ip, ":"); idx != -1 {
 					ip = ip[:idx]

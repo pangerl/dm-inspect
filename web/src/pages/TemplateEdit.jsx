@@ -11,6 +11,8 @@ function parseBasicFromYAML(yaml) {
     diskPaths: [],
     middlewares: { mysql: false, redis: false, nacos: false },
     container: /container_query:/.test(yaml),
+    containerServices: /container_services_query:/.test(yaml),
+    containerPorts: /container_ports_query:/.test(yaml),
   }
 
   // 解析磁盘路径
@@ -85,6 +87,12 @@ function generateYAMLFromBasic(config) {
     yaml += "\n# 容器运行情况\n"
     yaml += "container_query: \"count by(ident) (docker_container_status_started_at{container_status='running',group='{{.group}}'})\"\n"
   }
+  if (config.containerServices) {
+    yaml += "container_services_query: \"docker_container_status_started_at{group='{{.group}}'}\"\n"
+  }
+  if (config.containerPorts) {
+    yaml += "container_ports_query: \"net_response_result_code{group='{{.group}}'}\"\n"
+  }
 
   return yaml.trim()
 }
@@ -112,6 +120,8 @@ export default function TemplateEdit() {
     diskPaths: ['/', '/data'],
     middlewares: { mysql: false, redis: false, nacos: false },
     container: true,
+    containerServices: true,
+    containerPorts: true,
   })
 
   // 加载预设列表
@@ -386,15 +396,35 @@ export default function TemplateEdit() {
             {/* 容器统计 */}
             <div>
               <h4 className="text-sm font-semibold text-gray-900 mb-3">容器统计</h4>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={basicConfig.container}
-                  onChange={e => updateBasicConfig({ container: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700">统计运行中的容器数量</span>
-              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={basicConfig.container}
+                    onChange={e => updateBasicConfig({ container: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">统计运行中的容器数量</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={basicConfig.containerServices}
+                    onChange={e => updateBasicConfig({ containerServices: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">采集容器服务详情（名称、镜像、状态）</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={basicConfig.containerPorts}
+                    onChange={e => updateBasicConfig({ containerPorts: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">采集容器端口连通状态</span>
+                </label>
+              </div>
             </div>
 
             {/* YAML 预览 */}
@@ -422,7 +452,7 @@ export default function TemplateEdit() {
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               rows={22}
               spellCheck={false}
-              placeholder={`# 从上方选择预设，或手动填写 YAML 配置\n# 支持以下顶级字段：\n#   resources:      磁盘使用率查询\n#   middlewares:    中间件监控\n#   container_query: 容器统计`}
+              placeholder={`# 从上方选择预设，或手动填写 YAML 配置\n# 支持以下顶级字段：\n#   resources:                   磁盘使用率查询\n#   middlewares:                 中间件监控\n#   container_query:             容器运行数量统计\n#   container_services_query:    容器服务详情（名称、镜像、状态、启动时间）\n#   container_ports_query:       容器端口连通状态`}
               required
             />
           </div>

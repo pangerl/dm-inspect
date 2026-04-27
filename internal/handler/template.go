@@ -41,6 +41,8 @@ resources:
 
 # 容器运行情况（无容器时留空或删除此行）
 container_query: "count by(ident) (docker_container_status_started_at{container_status='running',group='{{.group}}'})"
+container_services_query: "docker_container_status_started_at{group='{{.group}}'}"
+container_ports_query: "net_response_result_code{group='{{.group}}'}"
 `),
 	},
 	{
@@ -79,6 +81,8 @@ middlewares:
 
 # 容器运行情况
 container_query: "count by(ident) (docker_container_status_started_at{container_status='running',group='{{.group}}'})"
+container_services_query: "docker_container_status_started_at{group='{{.group}}'}"
+container_ports_query: "net_response_result_code{group='{{.group}}'}"
 `),
 	},
 	{
@@ -120,6 +124,8 @@ middlewares:
 
 # 容器运行情况
 container_query: "count by(ident) (docker_container_status_started_at{container_status='running',group='{{.group}}'})"
+container_services_query: "docker_container_status_started_at{group='{{.group}}'}"
+container_ports_query: "net_response_result_code{group='{{.group}}'}"
 `),
 	},
 }

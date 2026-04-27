@@ -81,10 +81,26 @@ type MiddlewareStatus struct {
 	Metrics  map[string]string `json:"metrics,omitempty"` // 关键指标 KV
 }
 
+// ContainerPort 容器端口连通状态
+type ContainerPort struct {
+	Target string `json:"target"` // 如 172.31.36.36:10000
+	OK     bool   `json:"ok"`     // true 表示连通
+}
+
+// ContainerService 单个容器服务信息
+type ContainerService struct {
+	Name      string          `json:"name"`
+	Image     string          `json:"image"`
+	Status    string          `json:"status"` // running / exited / paused 等
+	StartedAt int64           `json:"started_at,omitempty"`
+	Ports     []ContainerPort `json:"ports,omitempty"`
+}
+
 // ContainerSummary 单台机器容器运行情况（区块四）
 type ContainerSummary struct {
-	Instance     string `json:"instance"`
-	RunningCount int    `json:"running_count"`
+	Instance     string             `json:"instance"`
+	RunningCount int                `json:"running_count"`
+	Services     []ContainerService `json:"services,omitempty"`
 }
 
 // AlertResult 告警事件
