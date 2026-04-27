@@ -138,3 +138,28 @@ type Highlight struct {
 	Title       string `json:"title"`       // 展示文案
 	Detail      string `json:"detail"`      // 详细说明
 }
+
+// Schedule 定时巡检任务
+type Schedule struct {
+	ID             int64     `json:"id"`
+	ProjectID      int64     `json:"project_id"`
+	Name           string    `json:"name"`
+	Cron           string    `json:"cron"`
+	InspectionType string    `json:"inspection_type"` // daily / monthly / quarterly / yearly
+	Enabled        bool      `json:"enabled"`
+	NotifyEmail    string    `json:"notify_email"`    // 逗号分隔多个邮箱
+	NotifyWechat   string    `json:"notify_wechat"`   // 企业微信 webhook URL
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+// ScheduleLog 定时任务执行记录
+type ScheduleLog struct {
+	ID             int64     `json:"id"`
+	ScheduleID     int64     `json:"schedule_id"`
+	ReportID       int64     `json:"report_id"`
+	Status         string    `json:"status"`          // success / failed
+	NotifiedEmail  bool      `json:"notified_email"`
+	NotifiedWechat bool      `json:"notified_wechat"`
+	ErrorMessage   string    `json:"error_message"`
+	CreatedAt      time.Time `json:"created_at"`
+}

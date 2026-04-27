@@ -30,6 +30,15 @@ func Setup(r *gin.Engine) {
 		// 巡检执行
 		api.POST("/executions", handler.ExecuteInspection)
 
+		// 定时任务管理
+		api.GET("/schedules", handler.ListSchedules)
+		api.POST("/schedules", handler.CreateSchedule)
+		api.GET("/schedules/:id", handler.GetSchedule)
+		api.PUT("/schedules/:id", handler.UpdateSchedule)
+		api.DELETE("/schedules/:id", handler.DeleteSchedule)
+		api.POST("/schedules/:id/run", handler.RunSchedule)
+		api.GET("/schedules/:id/logs", handler.ListScheduleLogs)
+
 		// 报告查询
 		api.GET("/reports", handler.ListReports)
 		api.GET("/reports/:id", handler.GetReport)

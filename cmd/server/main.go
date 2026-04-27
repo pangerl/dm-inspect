@@ -31,6 +31,18 @@ func main() {
 	inspectorSvc := service.NewInspector(cfg.VMEndpoint, cfg.N9EEndpoint, cfg.N9EUser, cfg.N9EPass)
 	handler.SetInspector(inspectorSvc)
 
+	// 初始化通知服务
+	notifierSvc := service.NewNotifier(cfg.SMTP, cfg.AppBaseURL)
+
+	// 初始化定时任务管理器，加载并启动
+	scheduleMgr := service.NewScheduleManager(inspectorSvc, notifierSvc)
+	if err := scheduleMgr.LoadAll(); err != nil {
+		log.Printf("[warn] 加载定时任务失败: %v", err)
+	}
+	scheduleMgr.Start()
+	defer scheduleMgr.Stop()
+	handler.SetScheduleManager(scheduleMgr)
+
 	// 启动 Gin
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()

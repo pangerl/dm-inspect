@@ -4,12 +4,15 @@ import ProjectEdit from './pages/ProjectEdit'
 import ProjectList from './pages/ProjectList'
 import ProjectQuickCreate from './pages/ProjectQuickCreate'
 import ReportList from './pages/ReportList'
+import ScheduleEdit from './pages/ScheduleEdit'
+import ScheduleList from './pages/ScheduleList'
 import TemplateEdit from './pages/TemplateEdit'
 import TemplateList from './pages/TemplateList'
 
 const NAV_ITEMS = [
   { path: '/projects',  label: '巡检项目' },
   { path: '/templates', label: '模板管理' },
+  { path: '/schedules', label: '定时任务' },
   { path: '/reports',   label: '巡检报告' },
 ]
 
@@ -65,6 +68,9 @@ export default function App() {
               <Route path="/templates/new" element={<TemplateEdit />} />
               <Route path="/templates/:id/edit" element={<TemplateEdit />} />
               <Route path="/reports" element={<ReportList />} />
+              <Route path="/schedules" element={<ScheduleList />} />
+              <Route path="/schedules/new" element={<ScheduleEdit />} />
+              <Route path="/schedules/:id/edit" element={<ScheduleEdit />} />
               <Route path="*" element={
                 <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                   <p className="text-4xl font-bold mb-2">404</p>
