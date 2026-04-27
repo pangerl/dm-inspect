@@ -67,13 +67,9 @@ type DiskUsage struct {
 	NA      bool    `json:"na"`      // 分区不存在
 }
 
-// ServerResource 单台服务器资源使用率（区块二）
+// ServerResource 单台服务器磁盘使用率（区块二）
 type ServerResource struct {
 	Instance   string      `json:"instance"`
-	CPUCurrent float64     `json:"cpu_current"` // 当前 CPU 使用率 %
-	CPUMax     float64     `json:"cpu_max"`
-	MemCurrent float64     `json:"mem_current"` // 当前内存使用率 %
-	MemMax     float64     `json:"mem_max"`
 	Disks      []DiskUsage `json:"disks"`
 }
 

@@ -36,10 +36,8 @@ func NewInspector(vmEndpoint, n9eEndpoint, n9eUser, n9ePass string) *Inspector {
 
 // TemplateConfig 巡检模板配置（YAML 解析结构）
 type TemplateConfig struct {
-	// 资源使用率
+	// 磁盘使用率
 	Resources struct {
-		CPUQuery    string `yaml:"cpu_query"`
-		MemQuery    string `yaml:"mem_query"`
 		DiskQueries []struct {
 			Path  string `yaml:"path"`
 			Query string `yaml:"query"`
@@ -168,7 +166,7 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		res, err := i.queryResources(ctx, cfg, vars, stime, etime)
+		res, err := i.queryDisks(ctx, cfg, vars, stime, etime)
 		mu.Lock()
 		resources = res
 		mu.Unlock()
@@ -318,13 +316,11 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 	return report, nil
 }
 
-// queryResources 并发采集各机器的 CPU/内存/磁盘数据，返回采集结果及可能发生的错误
-func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, vars map[string]string, stime, etime int64) ([]model.ServerResource, error) {
+// queryDisks 并发采集各机器的磁盘使用率数据，返回采集结果及可能发生的错误
+func (i *Inspector) queryDisks(ctx context.Context, cfg *TemplateConfig, vars map[string]string, stime, etime int64) ([]model.ServerResource, error) {
 	// 以 instance 为 key 汇聚各指标数据
 	type entry struct {
-		cpuCurrent, cpuMax float64
-		memCurrent, memMax float64
-		disks              []model.DiskUsage
+		disks []model.DiskUsage
 	}
 	byInstance := make(map[string]*entry)
 	var mu sync.Mutex
@@ -344,58 +340,6 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 			byInstance[inst] = &entry{}
 		}
 		return byInstance[inst]
-	}
-
-	// CPU
-	if cfg.Resources.CPUQuery != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			q, err := i.renderQuery(cfg.Resources.CPUQuery, vars)
-			if err != nil {
-				addErr(fmt.Sprintf("CPU查询渲染失败: %v", err))
-				return
-			}
-			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
-			if err != nil {
-				addErr(fmt.Sprintf("CPU查询失败: %v", err))
-				return
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			for _, p := range points {
-				inst := InstanceLabel(p.Labels)
-				e := ensureEntry(inst)
-				e.cpuCurrent = p.Current
-				e.cpuMax = p.Max
-			}
-		}()
-	}
-
-	// 内存
-	if cfg.Resources.MemQuery != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			q, err := i.renderQuery(cfg.Resources.MemQuery, vars)
-			if err != nil {
-				addErr(fmt.Sprintf("内存查询渲染失败: %v", err))
-				return
-			}
-			points, err := i.vmClient.QueryRange(ctx, q, stime, etime, vmQueryStep)
-			if err != nil {
-				addErr(fmt.Sprintf("内存查询失败: %v", err))
-				return
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			for _, p := range points {
-				inst := InstanceLabel(p.Labels)
-				e := ensureEntry(inst)
-				e.memCurrent = p.Current
-				e.memMax = p.Max
-			}
-		}()
 	}
 
 	// 磁盘（多个分区）
@@ -436,11 +380,7 @@ func (i *Inspector) queryResources(ctx context.Context, cfg *TemplateConfig, var
 		sort.Slice(e.disks, func(a, b int) bool { return e.disks[a].Path < e.disks[b].Path })
 		result = append(result, model.ServerResource{
 			Instance:   inst,
-			CPUCurrent: e.cpuCurrent,
-			CPUMax:     e.cpuMax,
-			MemCurrent: e.memCurrent,
-			MemMax:     e.memMax,
-			Disks:      e.disks,
+			Disks: e.disks,
 		})
 	}
 	sort.Slice(result, func(a, b int) bool { return result[a].Instance < result[b].Instance })

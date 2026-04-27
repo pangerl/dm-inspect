@@ -27,14 +27,12 @@ var presets = []presetTemplate{
 	{
 		Key:         "standard_linux",
 		Name:        "标准 Linux 服务器",
-		Description: "适用于通用 Linux 服务器：CPU / 内存 / 系统盘 / 数据盘，无中间件",
+		Description: "适用于通用 Linux 服务器：磁盘监控，无中间件",
 		Tags:        []string{"linux", "basic"},
 		Recommended: true,
 		Content: strings.TrimSpace(`
-# 资源使用率
+# 磁盘使用率
 resources:
-  cpu_query: "avg by(ident) (cpu_usage_active{cpu='cpu-total',group='{{.group}}'})"
-  mem_query: "avg by(ident) (mem_used_percent{group='{{.group}}'})"
   disk_queries:
     - path: "/"
       query: "avg by(ident) (disk_used_percent{path='/',group='{{.group}}'})"
@@ -48,14 +46,12 @@ container_query: "count by(ident) (docker_container_status_started_at{container_
 	{
 		Key:         "linux_with_mysql_redis",
 		Name:        "Linux + MySQL + Redis",
-		Description: "标准服务器资源 + MySQL 和 Redis 在线状态及关键指标",
+		Description: "磁盘监控 + MySQL 和 Redis 在线状态及关键指标",
 		Tags:        []string{"linux", "mysql", "redis"},
 		Recommended: true,
 		Content: strings.TrimSpace(`
-# 资源使用率
+# 磁盘使用率
 resources:
-  cpu_query: "avg by(ident) (cpu_usage_active{cpu='cpu-total',group='{{.group}}'})"
-  mem_query: "avg by(ident) (mem_used_percent{group='{{.group}}'})"
   disk_queries:
     - path: "/"
       query: "avg by(ident) (disk_used_percent{path='/',group='{{.group}}'})"
@@ -88,14 +84,12 @@ container_query: "count by(ident) (docker_container_status_started_at{container_
 	{
 		Key:         "linux_full_stack",
 		Name:        "Linux 全栈（MySQL + Redis + Nacos）",
-		Description: "标准资源 + MySQL / Redis / Nacos 三种中间件监控",
+		Description: "磁盘监控 + MySQL / Redis / Nacos 三种中间件监控",
 		Tags:        []string{"linux", "mysql", "redis", "nacos"},
 		Recommended: false,
 		Content: strings.TrimSpace(`
-# 资源使用率
+# 磁盘使用率
 resources:
-  cpu_query: "avg by(ident) (cpu_usage_active{cpu='cpu-total',group='{{.group}}'})"
-  mem_query: "avg by(ident) (mem_used_percent{group='{{.group}}'})"
   disk_queries:
     - path: "/"
       query: "avg by(ident) (disk_used_percent{path='/',group='{{.group}}'})"

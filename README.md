@@ -57,10 +57,8 @@ make run    # 启动服务
 访问 `/templates/new`，从**预设选择器**选择匹配场景的模板（推荐），或手动填写 YAML：
 
 ```yaml
-# 资源使用率（磁盘数据展示在服务器概览列）
+# 磁盘使用率（磁盘数据展示在服务器概览列）
 resources:
-  cpu_query: "avg by(ident) (cpu_usage_active{cpu='cpu-total',group='{{.group}}'})"
-  mem_query: "avg by(ident) (mem_used_percent{group='{{.group}}'})"
   disk_queries:
     - path: "/"
       query: "avg by(ident) (disk_used_percent{path='/',group='{{.group}}'})"

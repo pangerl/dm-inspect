@@ -8,8 +8,6 @@ import { useToast } from '../components/Toast'
 
 function parseBasicFromYAML(yaml) {
   const config = {
-    cpu: /cpu_query:/.test(yaml),
-    mem: /mem_query:/.test(yaml),
     diskPaths: [],
     middlewares: { mysql: false, redis: false, nacos: false },
     container: /container_query:/.test(yaml),
@@ -34,8 +32,6 @@ function parseBasicFromYAML(yaml) {
 
   // 若没有任何内容，给一套默认配置
   if (!yaml.trim()) {
-    config.cpu = true
-    config.mem = true
     config.diskPaths = ['/', '/data']
     config.container = true
   }
@@ -44,14 +40,7 @@ function parseBasicFromYAML(yaml) {
 }
 
 function generateYAMLFromBasic(config) {
-  let yaml = '# 资源使用率\nresources:\n'
-
-  if (config.cpu) {
-    yaml += "  cpu_query: \"avg by(ident) (cpu_usage_active{cpu='cpu-total',group='{{.group}}'})\"\n"
-  }
-  if (config.mem) {
-    yaml += "  mem_query: \"avg by(ident) (mem_used_percent{group='{{.group}}'})\"\n"
-  }
+  let yaml = '# 磁盘使用率\nresources:\n'
 
   if (config.diskPaths.length > 0) {
     yaml += '  disk_queries:\n'
@@ -120,8 +109,6 @@ export default function TemplateEdit() {
 
   // 基础模式配置
   const [basicConfig, setBasicConfig] = useState({
-    cpu: true,
-    mem: true,
     diskPaths: ['/', '/data'],
     middlewares: { mysql: false, redis: false, nacos: false },
     container: true,
@@ -313,31 +300,6 @@ export default function TemplateEdit() {
         {/* 基础模式内容 */}
         {mode === 'basic' && (
           <div className="px-6 py-5 space-y-6">
-            {/* 资源监控 */}
-            <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">资源监控</h4>
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={basicConfig.cpu}
-                    onChange={e => updateBasicConfig({ cpu: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">CPU</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={basicConfig.mem}
-                    onChange={e => updateBasicConfig({ mem: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">内存</span>
-                </label>
-              </div>
-            </div>
-
             {/* 磁盘路径 */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -460,7 +422,7 @@ export default function TemplateEdit() {
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               rows={22}
               spellCheck={false}
-              placeholder={`# 从上方选择预设，或手动填写 YAML 配置\n# 支持以下顶级字段：\n#   resources:      资源使用率查询\n#   middlewares:    中间件监控\n#   container_query: 容器统计`}
+              placeholder={`# 从上方选择预设，或手动填写 YAML 配置\n# 支持以下顶级字段：\n#   resources:      磁盘使用率查询\n#   middlewares:    中间件监控\n#   container_query: 容器统计`}
               required
             />
           </div>
