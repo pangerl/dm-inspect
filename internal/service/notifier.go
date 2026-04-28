@@ -126,7 +126,7 @@ func (n *Notifier) buildWechatMessage(projectName, reportDate string, reportID i
 	return sb.String()
 }
 
-// mdToHTML 将 Markdown 文本转换为 HTML
+// mdToHTML 将 Markdown 文本转换为带样式的 HTML（邮件友好）
 func mdToHTML(mdContent string) []byte {
 	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
 	p := parser.NewWithExtensions(extensions)
@@ -135,19 +135,38 @@ func mdToHTML(mdContent string) []byte {
 	htmlFlags := html.CommonFlags | html.HrefTargetBlank
 	opts := html.RendererOptions{Flags: htmlFlags}
 	renderer := html.NewRenderer(opts)
+	body := markdown.Render(doc, renderer)
 
-	return markdown.Render(doc, renderer)
+	// 包装邮件友好的样式，确保表格正常显示
+	result := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333; }
+table { border-collapse: collapse; width: 100%%; margin: 12px 0; font-size: 13px; }
+th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+th { background-color: #f5f5f5; font-weight: 600; }
+tr:nth-child(even) { background-color: #fafafa; }
+code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; font-size: 12px; }
+</style>
+</head>
+<body>
+%s
+</body>
+</html>`, string(body))
+	return []byte(result)
 }
 
 // AsyncNotify 异步执行邮件和企业微信通知，失败仅记录日志不阻塞
-func (n *Notifier) AsyncNotify(projectName string, reportDate string, report *model.Report, notifyEmail string, notifyWechat string) {
+func (n *Notifier) AsyncNotify(projectName string, group string, reportDate string, report *model.Report, notifyEmail string, notifyWechat string) {
 	go func() {
 		if notifyEmail != "" && n.smtp != nil {
 			toAddrs := parseEmailAddrs(notifyEmail)
 			if len(toAddrs) > 0 {
 				var reportData model.ReportData
 				if err := json.Unmarshal([]byte(report.Data), &reportData); err == nil {
-					md := GenerateMarkdown(projectName, "", reportDate, report.Status, report.ErrorMessage,
+					md := GenerateMarkdown(projectName, group, reportDate, report.Status, report.ErrorMessage,
 						report.FailedBlocks, report.Warnings, report.Summary, report.BlockResults, reportData)
 					subject := fmt.Sprintf("[巡检报告] %s - %s", projectName, reportDate)
 					if err := n.SendEmail(toAddrs, subject, md); err != nil {

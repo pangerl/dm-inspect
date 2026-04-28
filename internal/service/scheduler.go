@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
@@ -188,12 +189,25 @@ func (m *ScheduleManager) runSchedule(scheduleID int64) {
 
 	log.Printf("[scheduler] 任务 %d 巡检完成，报告 ID: %d", scheduleID, report.ID)
 
-	// 5. 发送通知（异步，不阻塞）
+	// 5. 获取项目 group 变量
+	var variables string
+	if err := store.DB.QueryRow("SELECT variables FROM projects WHERE id = ?", s.ProjectID).Scan(&variables); err != nil {
+		log.Printf("[scheduler] warn: failed to load project variables for project_id=%d: %v", s.ProjectID, err)
+	}
+	varsMap := make(map[string]string)
+	if variables != "" {
+		if err := json.Unmarshal([]byte(variables), &varsMap); err != nil {
+			log.Printf("[scheduler] warn: failed to parse project variables for project_id=%d: %v", s.ProjectID, err)
+		}
+	}
+	group := varsMap["group"]
+
+	// 6. 发送通知（异步，不阻塞）
 	if m.notifier != nil {
-		m.notifier.AsyncNotify(projectName, reportDate, report, s.NotifyEmail, s.NotifyWechat)
+		m.notifier.AsyncNotify(projectName, group, reportDate, report, s.NotifyEmail, s.NotifyWechat)
 	}
 
-	// 6. 记录日志
+	// 7. 记录日志
 	m.writeLog(scheduleID, report.ID, "success", s.NotifyEmail != "", s.NotifyWechat != "", "")
 }
 
