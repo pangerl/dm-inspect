@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ListReports 获取报告列表
+// ListReports 获取报告列表（支持分页）
 func ListReports(c *gin.Context) {
 	projectID := c.Query("project_id")
 	date := c.Query("date")
@@ -27,32 +27,56 @@ func ListReports(c *gin.Context) {
 		}
 	}
 
+	// 分页参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+
+	// 构建 WHERE 条件
+	where := "WHERE 1=1"
+	args := []interface{}{}
+
+	if projectID != "" {
+		where += " AND r.project_id = ?"
+		args = append(args, projectID)
+	}
+	if date != "" {
+		where += " AND r.report_date = ?"
+		args = append(args, date)
+	}
+	if status != "" {
+		where += " AND r.status = ?"
+		args = append(args, status)
+	}
+
+	// 查询总数
+	var total int
+	countQuery := "SELECT COUNT(*) FROM reports r " + where
+	if err := store.DB.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to count reports"})
+		return
+	}
+
+	// 查询列表
 	query := `
 		SELECT r.id, r.project_id, r.report_date, r.data, r.status, r.created_at,
 		       r.error_message, r.failed_blocks, r.warnings, r.summary,
 		       p.name as project_name
 		FROM reports r
 		LEFT JOIN projects p ON r.project_id = p.id
-		WHERE 1=1
-	`
-	args := []interface{}{}
+	` + where + " ORDER BY r.id DESC LIMIT ? OFFSET ?"
+	queryArgs := append(args, pageSize, offset)
 
-	if projectID != "" {
-		query += " AND r.project_id = ?"
-		args = append(args, projectID)
-	}
-	if date != "" {
-		query += " AND r.report_date = ?"
-		args = append(args, date)
-	}
-	if status != "" {
-		query += " AND r.status = ?"
-		args = append(args, status)
-	}
-
-	query += " ORDER BY r.id DESC"
-
-	rows, err := store.DB.Query(query, args...)
+	rows, err := store.DB.Query(query, queryArgs...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to query reports"})
 		return
@@ -82,7 +106,10 @@ func ListReports(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, reports)
+	c.JSON(http.StatusOK, gin.H{
+		"list":  reports,
+		"total": total,
+	})
 }
 
 // GetReport 获取报告详情（含运行时组装的重点关注和建议）

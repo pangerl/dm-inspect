@@ -50,6 +50,9 @@ export default function ReportList() {
   const [filterDate, setFilterDate] = useState(searchParams.get('date') || '')
   const [projectOptions, setProjectOptions] = useState([])
   const [reports, setReports] = useState([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(10)
   const [loading, setLoading] = useState(true)
   const [selectedReport, setSelectedReport] = useState(null)
   const [markdown, setMarkdown] = useState('')
@@ -73,16 +76,19 @@ export default function ReportList() {
     if (filterProject) params.set('project_id', filterProject)
     if (filterStatus) params.set('status', filterStatus)
     if (filterDate) params.set('date', filterDate)
+    params.set('page', String(page))
+    params.set('page_size', String(pageSize))
     return params.toString()
-  }, [filterProject, filterStatus, filterDate])
+  }, [filterProject, filterStatus, filterDate, page, pageSize])
 
   const fetchReports = useCallback(() => {
     const qs = buildQuery()
-    const url = qs ? `/reports?${qs}` : '/reports'
+    const url = `/reports?${qs}`
     return api.get(url)
       .then(data => {
-        setReports(data || [])
-        return data || []
+        setReports(data?.list || [])
+        setTotal(data?.total || 0)
+        return data?.list || []
       })
       .catch(err => {
         toast.error(err.message)
@@ -127,6 +133,7 @@ export default function ReportList() {
     if (updates.project_id !== undefined) setFilterProject(updates.project_id)
     if (updates.status !== undefined) setFilterStatus(updates.status)
     if (updates.date !== undefined) setFilterDate(updates.date)
+    setPage(1)
     setSelectedReport(null)
   }
 
@@ -359,6 +366,49 @@ export default function ReportList() {
                 ))}
               </tbody>
             </table>
+            {/* 分页 */}
+            {total > pageSize && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-ds-border">
+                <div className="text-xs text-ds-muted">
+                  共 {total} 条，第 {page} / {Math.ceil(total / pageSize)} 页
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="px-2 py-1 text-xs rounded border border-ds-border text-ds-muted hover:bg-ds-surface2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    上一页
+                  </button>
+                  {Array.from({ length: Math.ceil(total / pageSize) }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === Math.ceil(total / pageSize) || Math.abs(p - page) <= 1)
+                    .map((p, idx, arr) => (
+                      <span key={p} className="flex items-center gap-1">
+                        {idx > 0 && arr[idx - 1] !== p - 1 && (
+                          <span className="text-xs text-ds-muted px-1">...</span>
+                        )}
+                        <button
+                          onClick={() => setPage(p)}
+                          className={`w-7 h-7 text-xs rounded border transition-colors ${
+                            p === page
+                              ? 'bg-ds-accent border-ds-accent text-ds-text'
+                              : 'border-ds-border text-ds-muted hover:bg-ds-surface2'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    ))}
+                  <button
+                    onClick={() => setPage(p => Math.min(Math.ceil(total / pageSize), p + 1))}
+                    disabled={page >= Math.ceil(total / pageSize)}
+                    className="px-2 py-1 text-xs rounded border border-ds-border text-ds-muted hover:bg-ds-surface2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    下一页
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 报告详情（右侧） */}
