@@ -223,7 +223,12 @@ func GenerateMarkdown(projectName, group, reportDate, status, errorMessage, fail
 							if p.OK {
 								icon = "✅"
 							}
-							parts = append(parts, fmt.Sprintf("%s %s", p.Target, icon))
+							// 只展示端口号，不需要完整 IP
+							port := p.Target
+							if colonIdx := strings.LastIndex(port, ":"); colonIdx != -1 {
+								port = port[colonIdx+1:]
+							}
+							parts = append(parts, fmt.Sprintf("%s %s", port, icon))
 						}
 						portStatus = strings.Join(parts, ", ")
 					}

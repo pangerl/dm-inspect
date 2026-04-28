@@ -270,11 +270,29 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 		}
 
 		// 4. 关联端口到服务
+		// net_response 的 target IP 应对应 docker_container 的 ident（容器所在节点）
+		// 双重匹配：service name + target IP == ident
 		if serviceMap != nil && portMap != nil {
+			// 构建全局索引：serviceName -> targetIP -> []ContainerPort
+			allPortsByService := make(map[string]map[string][]model.ContainerPort)
+			for _, portsByName := range portMap {
+				for svcName, ports := range portsByName {
+					if allPortsByService[svcName] == nil {
+						allPortsByService[svcName] = make(map[string][]model.ContainerPort)
+					}
+					for _, p := range ports {
+						targetIP := p.Target
+						if colonIdx := strings.Index(targetIP, ":"); colonIdx != -1 {
+							targetIP = targetIP[:colonIdx]
+						}
+						allPortsByService[svcName][targetIP] = append(allPortsByService[svcName][targetIP], p)
+					}
+				}
+			}
 			for ident, services := range serviceMap {
-				if portsByName, ok := portMap[ident]; ok {
-					for name, svc := range services {
-						if ports, ok := portsByName[name]; ok {
+				for name, svc := range services {
+					if portsByIP, ok := allPortsByService[name]; ok {
+						if ports, ok := portsByIP[ident]; ok {
 							svc.Ports = ports
 						}
 					}
@@ -605,18 +623,32 @@ func (i *Inspector) queryContainerServices(ctx context.Context, query string, ts
 			// log.Printf("[Inspector] skip container point: no container name in labels %v", p.Labels)
 			continue
 		}
+		// Docker API 返回的容器名带 / 前缀，需统一去掉以便与 net_response 的 service label 匹配
+		name = strings.TrimPrefix(name, "/")
 		if result[inst] == nil {
 			result[inst] = make(map[string]*model.ContainerService)
 		}
 		result[inst][name] = &model.ContainerService{
 			Name:      name,
-			Image:     p.Labels["container_image"],
+			Image:     simplifyImageName(p.Labels["container_image"]),
 			Status:    p.Labels["container_status"],
 			StartedAt: int64(p.Value),
 		}
 	}
 	// log.Printf("[Inspector] queryContainerServices result: %d instances", len(result))
 	return result, nil
+}
+
+// simplifyImageName 简化容器镜像名称，去掉 registry 域名前缀
+// 如 crpi-xxx.cn-hangzhou.personal.cr.aliyuncs.com/data-match/dm-open-admin -> data-match/dm-open-admin
+func simplifyImageName(image string) string {
+	if idx := strings.Index(image, "/"); idx > 0 {
+		// 若 / 前面包含 .，说明前面是 registry 域名
+		if strings.Contains(image[:idx], ".") {
+			return image[idx+1:]
+		}
+	}
+	return image
 }
 
 // queryContainerPorts 执行容器端口状态查询，返回 ident -> service -> []ContainerPort
