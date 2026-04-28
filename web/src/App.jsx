@@ -1,5 +1,9 @@
+import { useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Menu } from 'lucide-react'
 import { ToastProvider } from './components/Toast'
+import { Sheet, SheetContent, SheetTrigger } from './components/ui/sheet'
+import { Separator } from './components/ui/separator'
 import ProjectEdit from './pages/ProjectEdit'
 import ProjectList from './pages/ProjectList'
 import ProjectQuickCreate from './pages/ProjectQuickCreate'
@@ -16,37 +20,97 @@ const NAV_ITEMS = [
   { path: '/reports',   label: '巡检报告' },
 ]
 
-function NavBar() {
+function Logo() {
+  return (
+    <div className="flex items-center gap-2">
+      <svg className="w-6 h-6 text-ds-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+      </svg>
+      <span className="font-semibold text-ds-text tracking-wide font-heading">dm-inspect</span>
+      <span className="text-ds-muted text-sm ml-1 hidden sm:inline">巡检系统</span>
+    </div>
+  )
+}
+
+function NavLink({ item, className, onClick }) {
+  const location = useLocation()
+  const active = location.pathname.startsWith(item.path)
+  return (
+    <Link
+      key={item.path}
+      to={item.path}
+      onClick={onClick}
+      className={`text-sm font-medium transition-colors cursor-pointer ${className} ${
+        active ? 'text-ds-accent' : 'text-ds-muted hover:text-ds-text'
+      }`}
+    >
+      {item.label}
+    </Link>
+  )
+}
+
+function DesktopNav() {
   const location = useLocation()
   return (
-    <nav className="bg-ds-surface text-ds-text px-6 h-14 flex items-center justify-between shrink-0 border-b border-ds-border">
-      <div className="flex items-center gap-2">
-        {/* 雷达扫描图标 */}
-        <svg className="w-6 h-6 text-ds-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
-        </svg>
-        <span className="font-semibold text-ds-text tracking-wide font-heading">dm-inspect</span>
-        <span className="text-ds-muted text-sm ml-1">巡检系统</span>
-      </div>
-      <div className="flex items-center h-full">
-        {NAV_ITEMS.map(item => {
-          const active = location.pathname.startsWith(item.path)
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center h-full px-4 text-sm font-medium border-b-2 transition-colors cursor-pointer
-                ${active
-                  ? 'border-ds-accent text-ds-text'
-                  : 'border-transparent text-ds-muted hover:text-ds-text hover:border-ds-muted'
-                }`}
-            >
-              {item.label}
-            </Link>
-          )
-        })}
-      </div>
+    <div className="hidden md:flex items-center h-full">
+      {NAV_ITEMS.map(item => {
+        const active = location.pathname.startsWith(item.path)
+        return (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`flex items-center h-full px-4 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              active
+                ? 'border-ds-accent text-ds-text'
+                : 'border-transparent text-ds-muted hover:text-ds-text hover:border-ds-muted'
+            }`}
+          >
+            {item.label}
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
+function MobileNav() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="md:hidden">
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <button className="p-2 text-ds-muted hover:text-ds-text transition-colors">
+            <Menu className="w-5 h-5" />
+          </button>
+        </SheetTrigger>
+        <SheetContent side="right" className="bg-ds-surface border-ds-border w-[280px]">
+          <div className="flex flex-col gap-6 mt-6">
+            <Logo />
+            <Separator className="bg-ds-border" />
+            <nav className="flex flex-col gap-4">
+              {NAV_ITEMS.map(item => (
+                <NavLink
+                  key={item.path}
+                  item={item}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center py-2"
+                />
+              ))}
+            </nav>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
+function NavBar() {
+  return (
+    <nav className="bg-ds-surface text-ds-text px-4 sm:px-6 h-14 flex items-center justify-between shrink-0 border-b border-ds-border">
+      <Logo />
+      <DesktopNav />
+      <MobileNav />
     </nav>
   )
 }
@@ -57,7 +121,7 @@ export default function App() {
       <ToastProvider>
         <div className="min-h-screen bg-ds-bg flex flex-col">
           <NavBar />
-          <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
             <Routes>
               <Route path="/" element={<Navigate to="/projects" replace />} />
               <Route path="/projects" element={<ProjectList />} />

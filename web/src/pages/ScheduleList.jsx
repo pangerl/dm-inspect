@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Play, Clock, Pencil, Trash2 } from 'lucide-react'
 import { api } from '../api'
 import Spinner from '../components/Spinner'
 import { useToast } from '../components/Toast'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 const TYPE_LABELS = {
   daily: '每日巡检',
@@ -16,7 +19,7 @@ export default function ScheduleList() {
   const [schedules, setSchedules] = useState([])
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
-  const [logModal, setLogModal] = useState(null) // { scheduleId, logs, loading }
+  const [logModal, setLogModal] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -32,9 +35,7 @@ export default function ScheduleList() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    load()
-  }, [])
+  useEffect(() => { load() }, [])
 
   const handleDelete = (id) => {
     if (!confirm('确定删除该定时任务？')) return
@@ -84,21 +85,20 @@ export default function ScheduleList() {
   if (loading) return <Spinner />
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-ds-text">定时任务</h2>
           <p className="text-sm text-ds-muted mt-1">配置自动巡检计划，支持邮件和企业微信通知</p>
         </div>
-        <Link
-          to="/schedules/new"
-          className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          新建任务
-        </Link>
+        <Button asChild className="bg-ds-accent hover:bg-ds-accent-hover text-ds-text">
+          <Link to="/schedules/new" className="inline-flex items-center gap-1.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            新建任务
+          </Link>
+        </Button>
       </div>
 
       {schedules.length === 0 ? (
@@ -109,28 +109,102 @@ export default function ScheduleList() {
           </Link>
         </div>
       ) : (
-        <div className="bg-ds-surface rounded-xl border border-ds-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-ds-surface2 text-ds-muted">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">任务名称</th>
-                <th className="text-left px-4 py-3 font-medium">关联项目</th>
-                <th className="text-left px-4 py-3 font-medium">Cron 表达式</th>
-                <th className="text-left px-4 py-3 font-medium">类型</th>
-                <th className="text-left px-4 py-3 font-medium">状态</th>
-                <th className="text-left px-4 py-3 font-medium">下次执行</th>
-                <th className="text-left px-4 py-3 font-medium">通知</th>
-                <th className="text-right px-4 py-3 font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ds-border">
-              {schedules.map(s => (
-                <tr key={s.id} className="hover:bg-ds-surface2">
-                  <td className="px-4 py-3 font-medium text-ds-text">{s.name}</td>
-                  <td className="px-4 py-3 text-ds-muted">{getProjectName(s.project_id)}</td>
-                  <td className="px-4 py-3 font-mono text-ds-muted text-xs">{s.cron}</td>
-                  <td className="px-4 py-3 text-ds-muted">{TYPE_LABELS[s.inspection_type] || s.inspection_type}</td>
-                  <td className="px-4 py-3">
+        <>
+          {/* 桌面端表格 */}
+          <div className="hidden md:block bg-ds-surface rounded-xl border border-ds-border overflow-hidden">
+            <table className="min-w-full text-sm">
+              <thead className="bg-ds-surface2 text-ds-muted">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium">任务名称</th>
+                  <th className="text-left px-4 py-3 font-medium">关联项目</th>
+                  <th className="text-left px-4 py-3 font-medium">Cron 表达式</th>
+                  <th className="text-left px-4 py-3 font-medium">类型</th>
+                  <th className="text-left px-4 py-3 font-medium">状态</th>
+                  <th className="text-left px-4 py-3 font-medium">下次执行</th>
+                  <th className="text-left px-4 py-3 font-medium">通知</th>
+                  <th className="text-right px-4 py-3 font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ds-border">
+                {schedules.map(s => (
+                  <tr key={s.id} className="hover:bg-ds-surface2">
+                    <td className="px-4 py-3 font-medium text-ds-text">{s.name}</td>
+                    <td className="px-4 py-3 text-ds-muted">{getProjectName(s.project_id)}</td>
+                    <td className="px-4 py-3 font-mono text-ds-muted text-xs">{s.cron}</td>
+                    <td className="px-4 py-3 text-ds-muted">{TYPE_LABELS[s.inspection_type] || s.inspection_type}</td>
+                    <td className="px-4 py-3">
+                      {s.enabled ? (
+                        <span className="inline-flex items-center gap-1 text-ds-accent text-xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-ds-accent" />
+                          启用
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-ds-muted text-xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-ds-muted" />
+                          禁用
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-ds-muted text-xs">
+                      {s.enabled ? formatNextRun(s.next_run) : '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {s.notify_email && (
+                          <span className="text-xs bg-ds-surface2 text-ds-muted px-1.5 py-0.5 rounded border border-ds-border" title={s.notify_email}>
+                            邮件
+                          </span>
+                        )}
+                        {s.notify_wechat && (
+                          <span className="text-xs bg-ds-accent/10 text-ds-accent px-1.5 py-0.5 rounded" title="企业微信">
+                            微信
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleRun(s.id)}
+                          className="text-ds-muted hover:text-ds-accent h-8 w-8"
+                          title="立即执行"
+                        >
+                          <Play className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => openLogs(s.id)}
+                          className="text-ds-muted hover:text-ds-accent h-8 w-8"
+                          title="执行历史"
+                        >
+                          <Clock className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild
+                          className="text-ds-muted hover:text-ds-accent h-8 w-8"
+                          title="编辑"
+                        >
+                          <Link to={`/schedules/${s.id}/edit`}>
+                            <Pencil className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}
+                          className="text-ds-muted hover:text-red-400 h-8 w-8"
+                          title="删除"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 移动端卡片 */}
+          <div className="md:hidden space-y-3">
+            {schedules.map(s => (
+              <Card key={s.id} className="bg-ds-surface border-ds-border">
+                <CardHeader className="p-4 pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base text-ds-text">{s.name}</CardTitle>
                     {s.enabled ? (
                       <span className="inline-flex items-center gap-1 text-ds-accent text-xs">
                         <span className="w-1.5 h-1.5 rounded-full bg-ds-accent" />
@@ -142,70 +216,63 @@ export default function ScheduleList() {
                         禁用
                       </span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-ds-muted text-xs">
-                    {s.enabled ? formatNextRun(s.next_run) : '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      {s.notify_email && (
-                        <span className="text-xs bg-ds-surface2 text-ds-muted px-1.5 py-0.5 rounded border border-ds-border" title={s.notify_email}>
-                          邮件
-                        </span>
-                      )}
-                      {s.notify_wechat && (
-                        <span className="text-xs bg-ds-accent/10 text-ds-accent px-1.5 py-0.5 rounded" title="企业微信">
-                          微信
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleRun(s.id)}
-                        className="p-1.5 rounded text-ds-muted hover:text-ds-accent transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ds-accent"
-                        title="立即执行"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => openLogs(s.id)}
-                        className="p-1.5 rounded text-ds-muted hover:text-ds-accent transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ds-accent"
-                        title="执行历史"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </button>
-                      <Link
-                        to={`/schedules/${s.id}/edit`}
-                        className="p-1.5 rounded text-ds-muted hover:text-ds-accent transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ds-accent"
-                        title="编辑"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
+                  </div>
+                  <CardDescription className="text-xs text-ds-muted mt-1">
+                    {getProjectName(s.project_id)} · {TYPE_LABELS[s.inspection_type] || s.inspection_type}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 pt-2 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-ds-muted font-mono text-xs">{s.cron}</span>
+                    <span className="text-ds-muted text-xs">
+                      {s.enabled ? formatNextRun(s.next_run) : '-'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {s.notify_email && (
+                      <span className="text-xs bg-ds-surface2 text-ds-muted px-1.5 py-0.5 rounded border border-ds-border">
+                        邮件
+                      </span>
+                    )}
+                    {s.notify_wechat && (
+                      <span className="text-xs bg-ds-accent/10 text-ds-accent px-1.5 py-0.5 rounded">
+                        微信
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 border-t border-ds-border">
+                    <Button variant="ghost" size="sm" onClick={() => handleRun(s.id)}
+                      className="text-ds-muted hover:text-ds-accent h-7 px-2 flex-1"
+                    >
+                      <Play className="w-3.5 h-3.5 mr-1" />
+                      执行
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => openLogs(s.id)}
+                      className="text-ds-muted hover:text-ds-accent h-7 px-2 flex-1"
+                    >
+                      <Clock className="w-3.5 h-3.5 mr-1" />
+                      历史
+                    </Button>
+                    <Button variant="ghost" size="sm" asChild
+                      className="text-ds-muted hover:text-ds-accent h-7 px-2 flex-1"
+                    >
+                      <Link to={`/schedules/${s.id}/edit`}>
+                        <Pencil className="w-3.5 h-3.5 mr-1" />
+                        编辑
                       </Link>
-                      <button
-                        onClick={() => handleDelete(s.id)}
-                        className="p-1.5 rounded text-ds-muted hover:text-red-400 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-400"
-                        title="删除"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)}
+                      className="text-ds-muted hover:text-red-400 h-7 px-2 flex-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1" />
+                      删除
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {/* 执行历史弹窗 */}
@@ -214,7 +281,7 @@ export default function ScheduleList() {
           <div className="bg-ds-surface rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-ds-border">
               <h3 className="font-semibold text-ds-text">执行历史</h3>
-              <button onClick={() => setLogModal(null)} className="text-ds-muted hover:text-ds-muted">
+              <button onClick={() => setLogModal(null)} className="text-ds-muted hover:text-ds-text">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>

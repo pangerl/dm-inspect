@@ -5,28 +5,19 @@ import Badge from '../components/Badge'
 import EmptyState from '../components/EmptyState'
 import Spinner from '../components/Spinner'
 import { useToast } from '../components/Toast'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
-// 从最近报告生成简短异常摘要，按状态优先级处理
 function formatSummary(lr) {
   if (!lr) return '—'
-
-  // 1. error 状态优先显示错误信息
-  if (lr.status === 'error') {
-    return lr.error_message || '巡检执行失败'
-  }
-
-  // 2. partial 状态优先显示失败区块
+  if (lr.status === 'error') return lr.error_message || '巡检执行失败'
   if (lr.status === 'partial') {
     try {
       const failed = JSON.parse(lr.failed_blocks)
-      if (Array.isArray(failed) && failed.length > 0) {
-        return `${failed.join('、')} 查询失败`
-      }
+      if (Array.isArray(failed) && failed.length > 0) return `${failed.join('、')} 查询失败`
     } catch { /* ignore */ }
     return '部分区块执行失败'
   }
-
-  // 3. completed 状态显示 summary 归纳
   if (!lr.summary || lr.summary === '') return '无异常'
   try {
     const s = JSON.parse(lr.summary)
@@ -41,7 +32,6 @@ function formatSummary(lr) {
   }
 }
 
-// 获取昨天的日期字符串 YYYY-MM-DD
 function getYesterday() {
   const d = new Date()
   d.setDate(d.getDate() - 1)
@@ -55,7 +45,7 @@ export default function ProjectList() {
   const [loading, setLoading] = useState(true)
   const [confirmId, setConfirmId] = useState(null)
   const [executingId, setExecutingId] = useState(null)
-  const [execDates, setExecDates] = useState({}) // project_id -> date
+  const [execDates, setExecDates] = useState({})
 
   const fetchProjects = () =>
     api.get('/projects')
@@ -93,28 +83,24 @@ export default function ProjectList() {
   if (loading) return <Spinner />
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-ds-text">巡检项目</h1>
           <p className="text-sm text-ds-muted mt-0.5">管理巡检范围、执行巡检并查看最近结果</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/projects/quick-new"
-            className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            使用预设快速创建
-          </Link>
-          <Link
-            to="/projects/new"
-            className="inline-flex items-center gap-1.5 bg-ds-surface text-ds-muted border border-ds-border text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-surface2 transition-colors"
-          >
-            高级创建项目
-          </Link>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <Button asChild className="bg-ds-accent hover:bg-ds-accent-hover text-ds-text">
+            <Link to="/projects/quick-new" className="inline-flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              使用预设快速创建
+            </Link>
+          </Button>
+          <Button variant="outline" asChild className="border-ds-border text-ds-muted hover:bg-ds-surface2 hover:text-ds-text">
+            <Link to="/projects/new">高级创建项目</Link>
+          </Button>
         </div>
       </div>
 
@@ -123,131 +109,203 @@ export default function ProjectList() {
           title="还没有巡检项目"
           description="推荐先用预设快速创建，3 分钟内完成首个巡检"
           action={
-            <div className="flex items-center gap-2">
-              <Link to="/projects/quick-new"
-                className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
-              >
-                使用预设快速创建
-              </Link>
-              <Link to="/templates"
-                className="inline-flex items-center gap-1.5 bg-ds-surface text-ds-muted border border-ds-border text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-surface2 transition-colors"
-              >
-                进入模板管理
-              </Link>
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <Button asChild className="bg-ds-accent hover:bg-ds-accent-hover text-ds-text">
+                <Link to="/projects/quick-new">使用预设快速创建</Link>
+              </Button>
+              <Button variant="outline" asChild className="border-ds-border text-ds-muted hover:bg-ds-surface2 hover:text-ds-text">
+                <Link to="/templates">进入模板管理</Link>
+              </Button>
             </div>
           }
         />
       ) : (
-        <div className="bg-ds-surface rounded-xl border border-ds-border overflow-hidden">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-ds-border bg-ds-surface2">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">项目名称</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">模板</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">Group</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">最近巡检</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">最近状态</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">最近异常摘要</th>
-                <th className="px-4 py-3 w-56" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ds-border">
-              {projects.map(p => {
-                let vars = {}
-                try { vars = JSON.parse(p.variables) } catch {}
-                const isExecuting = executingId === p.id
-                const lr = p.latest_report
-                return (
-                  <tr key={p.id} className="hover:bg-ds-surface2 transition-colors">
-                    <td className="px-4 py-3 font-medium text-ds-text">{p.name}</td>
-                    <td className="px-4 py-3 text-ds-muted">{p.template_name}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-block bg-ds-surface2 text-ds-muted text-xs px-2 py-0.5 rounded font-mono">
-                        {vars.group || '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-ds-muted">
-                      {lr?.report_date || '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {lr?.status ? <Badge status={lr.status} /> : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-ds-muted max-w-xs truncate" title={formatSummary(lr)}>
-                      {formatSummary(lr)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <div className="flex flex-col items-end gap-1">
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="date"
-                              value={execDates[p.id] || getYesterday()}
-                              onChange={e => setExecDates(prev => ({ ...prev, [p.id]: e.target.value }))}
-                              className="px-2 py-1 border border-ds-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-ds-accent"
-                            />
-                            <button
-                              onClick={() => handleExecute(p)}
-                              disabled={isExecuting}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-ds-accent text-ds-text rounded text-xs font-medium hover:bg-ds-accent-hover disabled:opacity-60 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-                            >
-                              {isExecuting ? (
-                                <span className="w-3 h-3 border-2 border-ds-text border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                              )}
-                              {isExecuting ? '启动中' : '执行巡检'}
-                            </button>
+        <>
+          {/* 桌面端表格 */}
+          <div className="hidden md:block bg-ds-surface rounded-xl border border-ds-border overflow-hidden">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-ds-border bg-ds-surface2">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">项目名称</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">模板</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">Group</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">最近巡检</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">最近状态</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">最近异常摘要</th>
+                  <th className="px-4 py-3 w-56" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ds-border">
+                {projects.map(p => {
+                  let vars = {}
+                  try { vars = JSON.parse(p.variables) } catch {}
+                  const isExecuting = executingId === p.id
+                  const lr = p.latest_report
+                  return (
+                    <tr key={p.id} className="hover:bg-ds-surface2 transition-colors">
+                      <td className="px-4 py-3 font-medium text-ds-text">{p.name}</td>
+                      <td className="px-4 py-3 text-ds-muted">{p.template_name}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-block bg-ds-surface2 text-ds-muted text-xs px-2 py-0.5 rounded font-mono">
+                          {vars.group || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-ds-muted">{lr?.report_date || '—'}</td>
+                      <td className="px-4 py-3">{lr?.status ? <Badge status={lr.status} /> : '—'}</td>
+                      <td className="px-4 py-3 text-ds-muted max-w-xs truncate" title={formatSummary(lr)}>
+                        {formatSummary(lr)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="date"
+                                value={execDates[p.id] || getYesterday()}
+                                onChange={e => setExecDates(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                className="px-2 py-1 border border-ds-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-ds-accent"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => handleExecute(p)}
+                                disabled={isExecuting}
+                                className="bg-ds-accent hover:bg-ds-accent-hover text-ds-text h-7 px-2.5 text-xs disabled:opacity-60"
+                              >
+                                {isExecuting ? '启动中' : '执行巡检'}
+                              </Button>
+                            </div>
+                            <span className="text-[10px] text-ds-muted">默认生成昨日巡检报告，可修改日期</span>
                           </div>
-                          <span className="text-[10px] text-ds-muted">默认生成昨日巡检报告，可修改日期</span>
-                        </div>
-                        <Link
-                          to={`/projects/${p.id}/edit`}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-ds-accent hover:bg-ds-accent/10 rounded text-xs font-medium transition-colors"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          编辑
-                        </Link>
-                        {confirmId === p.id ? (
-                          <span className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleDelete(p.id)}
-                              className="px-2 py-1 text-xs font-medium bg-red-500 text-ds-text rounded hover:bg-red-600 transition-colors"
-                            >
-                              确认
-                            </button>
-                            <button
-                              onClick={() => setConfirmId(null)}
-                              className="px-2 py-1 text-xs font-medium text-ds-muted hover:bg-ds-surface2 rounded transition-colors"
-                            >
-                              取消
-                            </button>
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmId(p.id)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-red-400 hover:bg-red-500/10 rounded text-xs font-medium transition-colors"
+                          <Button variant="ghost" size="sm" asChild
+                            className="text-ds-accent hover:text-ds-accent hover:bg-ds-accent/10 h-7 px-2"
                           >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            删除
-                          </button>
-                        )}
+                            <Link to={`/projects/${p.id}/edit`}>编辑</Link>
+                          </Button>
+                          {confirmId === p.id ? (
+                            <span className="flex items-center gap-1">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDelete(p.id)}
+                                className="h-7 px-2 text-xs"
+                              >
+                                确认
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setConfirmId(null)}
+                                className="h-7 px-2 text-xs"
+                              >
+                                取消
+                              </Button>
+                            </span>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setConfirmId(p.id)}
+                              className="text-red-400 hover:text-red-400 hover:bg-red-500/10 h-7 px-2"
+                            >
+                              删除
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 移动端卡片 */}
+          <div className="md:hidden space-y-3">
+            {projects.map(p => {
+              let vars = {}
+              try { vars = JSON.parse(p.variables) } catch {}
+              const isExecuting = executingId === p.id
+              const lr = p.latest_report
+              return (
+                <Card key={p.id} className="bg-ds-surface border-ds-border">
+                  <CardHeader className="p-4 pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base text-ds-text">{p.name}</CardTitle>
+                      {lr?.status && <Badge status={lr.status} />}
+                    </div>
+                    <CardDescription className="text-xs text-ds-muted flex items-center gap-2 mt-1">
+                      <span className="font-mono bg-ds-surface2 px-1.5 py-0.5 rounded">{vars.group || '—'}</span>
+                      <span>{p.template_name}</span>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2 space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-ds-muted">最近巡检</span>
+                      <span className="text-ds-text">{lr?.report_date || '—'}</span>
+                    </div>
+                    {lr && (
+                      <div className="text-xs text-ds-muted truncate" title={formatSummary(lr)}>
+                        {formatSummary(lr)}
                       </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                    )}
+                    <div className="flex items-center gap-2 pt-2 border-t border-ds-border">
+                      <input
+                        type="date"
+                        value={execDates[p.id] || getYesterday()}
+                        onChange={e => setExecDates(prev => ({ ...prev, [p.id]: e.target.value }))}
+                        className="flex-1 px-2 py-1 border border-ds-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-ds-accent"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleExecute(p)}
+                        disabled={isExecuting}
+                        className="bg-ds-accent hover:bg-ds-accent-hover text-ds-text h-7 px-2.5 text-xs disabled:opacity-60 whitespace-nowrap"
+                      >
+                        {isExecuting ? '启动中' : '执行巡检'}
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" asChild
+                        className="text-ds-accent hover:text-ds-accent hover:bg-ds-accent/10 h-7 px-2 flex-1"
+                      >
+                        <Link to={`/projects/${p.id}/edit`}>编辑</Link>
+                      </Button>
+                      {confirmId === p.id ? (
+                        <>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(p.id)}
+                            className="h-7 px-2 text-xs flex-1"
+                          >
+                            确认删除
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setConfirmId(null)}
+                            className="h-7 px-2 text-xs flex-1"
+                          >
+                            取消
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmId(p.id)}
+                          className="text-red-400 hover:text-red-400 hover:bg-red-500/10 h-7 px-2 flex-1"
+                        >
+                          删除
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
   )

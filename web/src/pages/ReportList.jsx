@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import { api } from '../api'
 import Badge from '../components/Badge'
 import EmptyState from '../components/EmptyState'
 import Spinner from '../components/Spinner'
 import { useToast } from '../components/Toast'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 // 安全解析 JSON，失败或结果为 null 时返回默认值
 function safeParse(json, fallback) {
@@ -234,7 +237,7 @@ export default function ReportList() {
   return (
     <div>
       {/* 页面头 */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl font-semibold text-ds-text">巡检报告</h1>
           <p className="text-sm text-ds-muted mt-0.5">
@@ -247,7 +250,7 @@ export default function ReportList() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {filterProject && (
             <div className="flex items-center gap-2">
               <input
@@ -330,42 +333,68 @@ export default function ReportList() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* 报告列表（左侧） */}
           <div className="lg:col-span-2 bg-ds-surface rounded-xl border border-ds-border overflow-hidden self-start">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-ds-border bg-ds-surface2">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">项目</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">日期</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">状态</th>
-                  <th className="px-4 py-3 w-12" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ds-border">
-                {reports.map(r => (
-                  <tr
-                    key={r.id}
-                    className={`cursor-pointer hover:bg-ds-surface2 transition-colors ${
-                      selectedReport?.id === r.id ? 'bg-ds-accent/10 hover:bg-ds-accent/10' : ''
-                    }`}
-                    onClick={() => handleViewReport(r)}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-ds-text truncate max-w-[140px]">{r.project_name}</div>
-                      <div className="text-xs text-ds-muted mt-0.5 truncate max-w-[140px]">{reportListSummary(r)}</div>
-                    </td>
-                    <td className="px-4 py-3 text-ds-muted whitespace-nowrap">{r.report_date}</td>
-                    <td className="px-4 py-3">
-                      <Badge status={r.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <svg className={`w-4 h-4 inline-block transition-colors ${selectedReport?.id === r.id ? 'text-ds-accent' : 'text-ds-muted'}`}
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </td>
+            {/* 桌面端表格 */}
+            <div className="hidden md:block">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-ds-border bg-ds-surface2">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">项目</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">日期</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">状态</th>
+                    <th className="px-4 py-3 w-12" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-ds-border">
+                  {reports.map(r => (
+                    <tr
+                      key={r.id}
+                      className={`cursor-pointer hover:bg-ds-surface2 transition-colors ${
+                        selectedReport?.id === r.id ? 'bg-ds-accent/10 hover:bg-ds-accent/10' : ''
+                      }`}
+                      onClick={() => handleViewReport(r)}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-ds-text">{r.project_name}</div>
+                        <div className="text-xs text-ds-muted mt-0.5">{reportListSummary(r)}</div>
+                      </td>
+                      <td className="px-4 py-3 text-ds-muted whitespace-nowrap">{r.report_date}</td>
+                      <td className="px-4 py-3">
+                        <Badge status={r.status} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <ChevronRight className={`w-4 h-4 inline-block transition-colors ${selectedReport?.id === r.id ? 'text-ds-accent' : 'text-ds-muted'}`} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 移动端卡片 */}
+            <div className="md:hidden divide-y divide-ds-border">
+              {reports.map(r => (
+                <div
+                  key={r.id}
+                  className={`cursor-pointer p-4 transition-colors ${
+                    selectedReport?.id === r.id ? 'bg-ds-accent/10' : 'hover:bg-ds-surface2'
+                  }`}
+                  onClick={() => handleViewReport(r)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-ds-text">{r.project_name}</div>
+                      <div className="text-xs text-ds-muted mt-0.5">{r.report_date}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge status={r.status} />
+                      <ChevronRight className={`w-4 h-4 transition-colors ${selectedReport?.id === r.id ? 'text-ds-accent' : 'text-ds-muted'}`} />
+                    </div>
+                  </div>
+                  <div className="text-xs text-ds-muted mt-1 truncate">{reportListSummary(r)}</div>
+                </div>
+              ))}
+            </div>
+
             {/* 分页 */}
             {total > pageSize && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-ds-border">

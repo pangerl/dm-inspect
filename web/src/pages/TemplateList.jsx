@@ -4,12 +4,14 @@ import { api } from '../api'
 import EmptyState from '../components/EmptyState'
 import Spinner from '../components/Spinner'
 import { useToast } from '../components/Toast'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 export default function TemplateList() {
   const toast = useToast()
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
-  const [confirmId, setConfirmId] = useState(null) // 内联确认删除
+  const [confirmId, setConfirmId] = useState(null)
 
   useEffect(() => {
     api.get('/templates')
@@ -33,22 +35,22 @@ export default function TemplateList() {
   if (loading) return <Spinner />
 
   return (
-    <div>
-      {/* 页面头 */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-ds-text">模板管理</h1>
-          <p className="text-sm text-ds-muted mt-0.5">管理巡检指标模板，模板被项目引用后不可删除</p>
+          <p className="text-sm text-ds-muted mt-0.5">
+            管理巡检指标模板，模板被项目引用后不可删除
+          </p>
         </div>
-        <Link
-          to="/templates/new"
-          className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          创建模板
-        </Link>
+        <Button asChild className="bg-ds-accent hover:bg-ds-accent-hover text-ds-text">
+          <Link to="/templates/new" className="inline-flex items-center gap-1.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            创建模板
+          </Link>
+        </Button>
       </div>
 
       {templates.length === 0 ? (
@@ -56,78 +58,126 @@ export default function TemplateList() {
           title="暂无模板"
           description="模板定义了巡检的指标和查询规则，先创建一个模板"
           action={
-            <Link to="/templates/new"
-              className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
-            >
-              创建第一个模板
-            </Link>
+            <Button asChild className="bg-ds-accent hover:bg-ds-accent-hover text-ds-text">
+              <Link to="/templates/new">创建第一个模板</Link>
+            </Button>
           }
         />
       ) : (
-        <div className="bg-ds-surface rounded-xl border border-ds-border overflow-hidden">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-ds-border bg-ds-surface2">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider w-16">ID</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">模板名称</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">创建时间</th>
-                <th className="px-4 py-3 w-28" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ds-border">
-              {templates.map(t => (
-                <tr key={t.id} className="hover:bg-ds-surface2 transition-colors">
-                  <td className="px-4 py-3 text-ds-muted">{t.id}</td>
-                  <td className="px-4 py-3 font-medium text-ds-text">{t.name}</td>
-                  <td className="px-4 py-3 text-ds-muted">
-                    {new Date(t.created_at).toLocaleString('zh-CN')}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link
-                        to={`/templates/${t.id}/edit`}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-ds-accent hover:bg-ds-accent/10 rounded text-xs font-medium transition-colors"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        编辑
-                      </Link>
-                      {confirmId === t.id ? (
-                        <span className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleDelete(t.id)}
-                            className="px-2 py-1 text-xs font-medium bg-red-500 text-ds-text rounded hover:bg-red-600 transition-colors"
-                          >
-                            确认
-                          </button>
-                          <button
-                            onClick={() => setConfirmId(null)}
-                            className="px-2 py-1 text-xs font-medium text-ds-muted hover:bg-ds-surface2 rounded transition-colors"
-                          >
-                            取消
-                          </button>
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmId(t.id)}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-red-400 hover:bg-red-500/10 rounded text-xs font-medium transition-colors"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          删除
-                        </button>
-                      )}
-                    </div>
-                  </td>
+        <>
+          {/* 桌面端表格 */}
+          <div className="hidden md:block bg-ds-surface rounded-xl border border-ds-border overflow-hidden">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-ds-border bg-ds-surface2">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider w-16">ID</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">模板名称</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">创建时间</th>
+                  <th className="px-4 py-3 w-28" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-ds-border">
+                {templates.map(t => (
+                  <tr key={t.id} className="hover:bg-ds-surface2 transition-colors">
+                    <td className="px-4 py-3 text-ds-muted">{t.id}</td>
+                    <td className="px-4 py-3 font-medium text-ds-text">{t.name}</td>
+                    <td className="px-4 py-3 text-ds-muted">
+                      {new Date(t.created_at).toLocaleString('zh-CN')}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" asChild
+                          className="text-ds-accent hover:text-ds-accent hover:bg-ds-accent/10 h-7 px-2"
+                        >
+                          <Link to={`/templates/${t.id}/edit`}>编辑</Link>
+                        </Button>
+                        {confirmId === t.id ? (
+                          <span className="flex items-center gap-1">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDelete(t.id)}
+                              className="h-7 px-2 text-xs"
+                            >
+                              确认
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setConfirmId(null)}
+                              className="h-7 px-2 text-xs"
+                            >
+                              取消
+                            </Button>
+                          </span>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setConfirmId(t.id)}
+                            className="text-red-400 hover:text-red-400 hover:bg-red-500/10 h-7 px-2"
+                          >
+                            删除
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 移动端卡片 */}
+          <div className="md:hidden space-y-3">
+            {templates.map(t => (
+              <Card key={t.id} className="bg-ds-surface border-ds-border">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-base text-ds-text">{t.name}</CardTitle>
+                  <CardDescription className="text-xs text-ds-muted">
+                    ID: {t.id} · {new Date(t.created_at).toLocaleString('zh-CN')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 pt-2 flex gap-2">
+                  <Button variant="ghost" size="sm" asChild
+                    className="text-ds-accent hover:text-ds-accent hover:bg-ds-accent/10 h-7 px-2"
+                  >
+                    <Link to={`/templates/${t.id}/edit`}>编辑</Link>
+                  </Button>
+                  {confirmId === t.id ? (
+                    <>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(t.id)}
+                        className="h-7 px-2 text-xs"
+                      >
+                        确认
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmId(null)}
+                        className="h-7 px-2 text-xs"
+                      >
+                        取消
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmId(t.id)}
+                      className="text-red-400 hover:text-red-400 hover:bg-red-500/10 h-7 px-2"
+                    >
+                      删除
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
