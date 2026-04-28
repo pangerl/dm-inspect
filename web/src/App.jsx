@@ -19,15 +19,15 @@ const NAV_ITEMS = [
 function NavBar() {
   const location = useLocation()
   return (
-    <nav className="bg-gray-900 text-white px-6 h-14 flex items-center justify-between shrink-0">
+    <nav className="bg-ds-surface text-ds-text px-6 h-14 flex items-center justify-between shrink-0 border-b border-ds-border">
       <div className="flex items-center gap-2">
         {/* 雷达扫描图标 */}
-        <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-6 h-6 text-ds-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
         </svg>
-        <span className="font-semibold text-white tracking-wide">dm-inspect</span>
-        <span className="text-gray-500 text-sm ml-1">巡检系统</span>
+        <span className="font-semibold text-ds-text tracking-wide font-heading">dm-inspect</span>
+        <span className="text-ds-muted text-sm ml-1">巡检系统</span>
       </div>
       <div className="flex items-center h-full">
         {NAV_ITEMS.map(item => {
@@ -36,10 +36,10 @@ function NavBar() {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center h-full px-4 text-sm font-medium border-b-2 transition-colors
+              className={`flex items-center h-full px-4 text-sm font-medium border-b-2 transition-colors cursor-pointer
                 ${active
-                  ? 'border-blue-400 text-white'
-                  : 'border-transparent text-gray-400 hover:text-white hover:border-gray-500'
+                  ? 'border-ds-accent text-ds-text'
+                  : 'border-transparent text-ds-muted hover:text-ds-text hover:border-ds-muted'
                 }`}
             >
               {item.label}
@@ -55,7 +55,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ToastProvider>
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-ds-bg flex flex-col">
           <NavBar />
           <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
             <Routes>
@@ -72,7 +72,7 @@ export default function App() {
               <Route path="/schedules/new" element={<ScheduleEdit />} />
               <Route path="/schedules/:id/edit" element={<ScheduleEdit />} />
               <Route path="*" element={
-                <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                <div className="flex flex-col items-center justify-center h-64 text-ds-muted">
                   <p className="text-4xl font-bold mb-2">404</p>
                   <p>页面未找到</p>
                 </div>

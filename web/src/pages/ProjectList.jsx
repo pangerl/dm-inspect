@@ -96,13 +96,13 @@ export default function ProjectList() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">巡检项目</h1>
-          <p className="text-sm text-gray-500 mt-0.5">管理巡检范围、执行巡检并查看最近结果</p>
+          <h1 className="text-xl font-semibold text-ds-text">巡检项目</h1>
+          <p className="text-sm text-ds-muted mt-0.5">管理巡检范围、执行巡检并查看最近结果</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             to="/projects/quick-new"
-            className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -111,7 +111,7 @@ export default function ProjectList() {
           </Link>
           <Link
             to="/projects/new"
-            className="inline-flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center gap-1.5 bg-ds-surface text-ds-muted border border-ds-border text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-surface2 transition-colors"
           >
             高级创建项目
           </Link>
@@ -125,12 +125,12 @@ export default function ProjectList() {
           action={
             <div className="flex items-center gap-2">
               <Link to="/projects/quick-new"
-                className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
               >
                 使用预设快速创建
               </Link>
               <Link to="/templates"
-                className="inline-flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center gap-1.5 bg-ds-surface text-ds-muted border border-ds-border text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-surface2 transition-colors"
               >
                 进入模板管理
               </Link>
@@ -138,41 +138,41 @@ export default function ProjectList() {
           }
         />
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-ds-surface rounded-xl border border-ds-border overflow-hidden">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">项目名称</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">模板</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Group</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">最近巡检</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">最近状态</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">最近异常摘要</th>
+              <tr className="border-b border-ds-border bg-ds-surface2">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">项目名称</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">模板</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">Group</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">最近巡检</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">最近状态</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">最近异常摘要</th>
                 <th className="px-4 py-3 w-56" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-ds-border">
               {projects.map(p => {
                 let vars = {}
                 try { vars = JSON.parse(p.variables) } catch {}
                 const isExecuting = executingId === p.id
                 const lr = p.latest_report
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
-                    <td className="px-4 py-3 text-gray-500">{p.template_name}</td>
+                  <tr key={p.id} className="hover:bg-ds-surface2 transition-colors">
+                    <td className="px-4 py-3 font-medium text-ds-text">{p.name}</td>
+                    <td className="px-4 py-3 text-ds-muted">{p.template_name}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded font-mono">
+                      <span className="inline-block bg-ds-surface2 text-ds-muted text-xs px-2 py-0.5 rounded font-mono">
                         {vars.group || '—'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td className="px-4 py-3 text-ds-muted">
                       {lr?.report_date || '—'}
                     </td>
                     <td className="px-4 py-3">
                       {lr?.status ? <Badge status={lr.status} /> : '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 max-w-xs truncate" title={formatSummary(lr)}>
+                    <td className="px-4 py-3 text-ds-muted max-w-xs truncate" title={formatSummary(lr)}>
                       {formatSummary(lr)}
                     </td>
                     <td className="px-4 py-3">
@@ -183,15 +183,15 @@ export default function ProjectList() {
                               type="date"
                               value={execDates[p.id] || getYesterday()}
                               onChange={e => setExecDates(prev => ({ ...prev, [p.id]: e.target.value }))}
-                              className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="px-2 py-1 border border-ds-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-ds-accent"
                             />
                             <button
                               onClick={() => handleExecute(p)}
                               disabled={isExecuting}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-ds-accent text-ds-text rounded text-xs font-medium hover:bg-ds-accent-hover disabled:opacity-60 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                             >
                               {isExecuting ? (
-                                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span className="w-3 h-3 border-2 border-ds-text border-t-transparent rounded-full animate-spin" />
                               ) : (
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -201,11 +201,11 @@ export default function ProjectList() {
                               {isExecuting ? '启动中' : '执行巡检'}
                             </button>
                           </div>
-                          <span className="text-[10px] text-gray-400">默认生成昨日巡检报告，可修改日期</span>
+                          <span className="text-[10px] text-ds-muted">默认生成昨日巡检报告，可修改日期</span>
                         </div>
                         <Link
                           to={`/projects/${p.id}/edit`}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs font-medium transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-ds-accent hover:bg-ds-accent/10 rounded text-xs font-medium transition-colors"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -217,13 +217,13 @@ export default function ProjectList() {
                           <span className="flex items-center gap-1">
                             <button
                               onClick={() => handleDelete(p.id)}
-                              className="px-2 py-1 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                              className="px-2 py-1 text-xs font-medium bg-red-500 text-ds-text rounded hover:bg-red-600 transition-colors"
                             >
                               确认
                             </button>
                             <button
                               onClick={() => setConfirmId(null)}
-                              className="px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                              className="px-2 py-1 text-xs font-medium text-ds-muted hover:bg-ds-surface2 rounded transition-colors"
                             >
                               取消
                             </button>
@@ -231,7 +231,7 @@ export default function ProjectList() {
                         ) : (
                           <button
                             onClick={() => setConfirmId(p.id)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-red-500 hover:bg-red-50 rounded text-xs font-medium transition-colors"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-red-400 hover:bg-red-500/10 rounded text-xs font-medium transition-colors"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

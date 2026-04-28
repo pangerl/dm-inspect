@@ -188,10 +188,29 @@ export default function ReportList() {
   const selectedSuggestions = selectedReport ? safeParse(selectedReport.suggestions, []) : []
 
   const blockStatusIcon = (status) => {
-    if (status === 'success') return <span className="text-green-500">✓</span>
-    if (status === 'failed') return <span className="text-red-500">✗</span>
-    if (status === 'skipped') return <span className="text-gray-400">−</span>
-    return <span className="text-gray-300">○</span>
+    if (status === 'success')
+      return (
+        <svg className="w-4 h-4 text-ds-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      )
+    if (status === 'failed')
+      return (
+        <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      )
+    if (status === 'skipped')
+      return (
+        <svg className="w-4 h-4 text-ds-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+        </svg>
+      )
+    return (
+      <svg className="w-4 h-4 text-ds-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" strokeWidth={2} />
+      </svg>
+    )
   }
 
   // 判断摘要是否有实际数据（避免旧报告显示全0的无意义卡片）
@@ -210,12 +229,12 @@ export default function ReportList() {
       {/* 页面头 */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">巡检报告</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-semibold text-ds-text">巡检报告</h1>
+          <p className="text-sm text-ds-muted mt-0.5">
             查看巡检结果、执行状态和异常摘要
             {Array.isArray(reports) && reports.some(r => r?.status === 'pending') && (
-              <span className="ml-2 text-yellow-600 inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse inline-block" />
+              <span className="ml-2 text-amber-400 inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
                 有任务进行中，每5秒自动刷新
               </span>
             )}
@@ -228,15 +247,15 @@ export default function ReportList() {
                 type="date"
                 value={execDate}
                 onChange={e => setExecDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-ds-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent"
               />
               <button
                 onClick={handleExecuteForProject}
                 disabled={executingProject}
-                className="inline-flex items-center gap-1.5 bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-60 transition-colors"
+                className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover disabled:opacity-60 transition-colors"
               >
                 {executingProject ? (
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-ds-text border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -251,7 +270,7 @@ export default function ReportList() {
           <select
             value={filterProject}
             onChange={e => updateFilters({ project_id: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-ds-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent"
           >
             <option value="">全部项目</option>
             {projectOptions.map(p => (
@@ -261,7 +280,7 @@ export default function ReportList() {
           <select
             value={filterStatus}
             onChange={e => updateFilters({ status: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-ds-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent"
           >
             <option value="">全部状态</option>
             <option value="pending">进行中</option>
@@ -273,7 +292,7 @@ export default function ReportList() {
             type="date"
             value={filterDate}
             onChange={e => updateFilters({ date: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-ds-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent"
           />
         </div>
       </div>
@@ -287,13 +306,13 @@ export default function ReportList() {
               <button
                 onClick={handleExecuteForProject}
                 disabled={executingProject}
-                className="inline-flex items-center gap-1.5 bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-60 transition-colors"
+                className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover disabled:opacity-60 transition-colors"
               >
                 立即执行巡检
               </button>
             ) : (
               <Link to="/projects"
-                className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
               >
                 前往巡检项目
               </Link>
@@ -303,35 +322,35 @@ export default function ReportList() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* 报告列表（左侧） */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden self-start">
+          <div className="lg:col-span-2 bg-ds-surface rounded-xl border border-ds-border overflow-hidden self-start">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">项目</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">日期</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">状态</th>
+                <tr className="border-b border-ds-border bg-ds-surface2">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">项目</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">日期</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">状态</th>
                   <th className="px-4 py-3 w-12" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-ds-border">
                 {reports.map(r => (
                   <tr
                     key={r.id}
-                    className={`cursor-pointer hover:bg-gray-50 transition-colors ${
-                      selectedReport?.id === r.id ? 'bg-blue-50 hover:bg-blue-50' : ''
+                    className={`cursor-pointer hover:bg-ds-surface2 transition-colors ${
+                      selectedReport?.id === r.id ? 'bg-ds-accent/10 hover:bg-ds-accent/10' : ''
                     }`}
                     onClick={() => handleViewReport(r)}
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 truncate max-w-[140px]">{r.project_name}</div>
-                      <div className="text-xs text-gray-400 mt-0.5 truncate max-w-[140px]">{reportListSummary(r)}</div>
+                      <div className="font-medium text-ds-text truncate max-w-[140px]">{r.project_name}</div>
+                      <div className="text-xs text-ds-muted mt-0.5 truncate max-w-[140px]">{reportListSummary(r)}</div>
                     </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{r.report_date}</td>
+                    <td className="px-4 py-3 text-ds-muted whitespace-nowrap">{r.report_date}</td>
                     <td className="px-4 py-3">
                       <Badge status={r.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <svg className={`w-4 h-4 inline-block transition-colors ${selectedReport?.id === r.id ? 'text-blue-500' : 'text-gray-300'}`}
+                      <svg className={`w-4 h-4 inline-block transition-colors ${selectedReport?.id === r.id ? 'text-ds-accent' : 'text-ds-muted'}`}
                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
@@ -348,32 +367,32 @@ export default function ReportList() {
               <>
                 {/* 1. 巡检摘要卡片 */}
                 {hasSummaryData && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">巡检摘要</h3>
+                  <div className="bg-ds-surface rounded-xl border border-ds-border p-5">
+                    <h3 className="text-sm font-semibold text-ds-text mb-3">巡检摘要</h3>
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                      <div className="text-center p-2 bg-gray-50 rounded-lg">
-                        <div className="text-lg font-bold text-gray-900">{selectedSummary.offline_servers || 0}</div>
-                        <div className="text-[10px] text-gray-500">离线</div>
+                      <div className="text-center p-2 bg-ds-surface2 rounded-lg">
+                        <div className="text-lg font-bold text-ds-text">{selectedSummary.offline_servers || 0}</div>
+                        <div className="text-[10px] text-ds-muted">离线</div>
                       </div>
-                      <div className="text-center p-2 bg-gray-50 rounded-lg">
-                        <div className="text-lg font-bold text-gray-900">{selectedSummary.clock_offset_issues || 0}</div>
-                        <div className="text-[10px] text-gray-500">时间偏移</div>
+                      <div className="text-center p-2 bg-ds-surface2 rounded-lg">
+                        <div className="text-lg font-bold text-ds-text">{selectedSummary.clock_offset_issues || 0}</div>
+                        <div className="text-[10px] text-ds-muted">时间偏移</div>
                       </div>
-                      <div className="text-center p-2 bg-gray-50 rounded-lg">
-                        <div className="text-lg font-bold text-gray-900">{selectedSummary.disk_critical || 0}</div>
-                        <div className="text-[10px] text-gray-500">磁盘风险</div>
+                      <div className="text-center p-2 bg-ds-surface2 rounded-lg">
+                        <div className="text-lg font-bold text-ds-text">{selectedSummary.disk_critical || 0}</div>
+                        <div className="text-[10px] text-ds-muted">磁盘风险</div>
                       </div>
-                      <div className="text-center p-2 bg-gray-50 rounded-lg">
-                        <div className="text-lg font-bold text-gray-900">{selectedSummary.middleware_abnormal || 0}</div>
-                        <div className="text-[10px] text-gray-500">中间件异常</div>
+                      <div className="text-center p-2 bg-ds-surface2 rounded-lg">
+                        <div className="text-lg font-bold text-ds-text">{selectedSummary.middleware_abnormal || 0}</div>
+                        <div className="text-[10px] text-ds-muted">中间件异常</div>
                       </div>
-                      <div className="text-center p-2 bg-gray-50 rounded-lg">
-                        <div className="text-lg font-bold text-red-600">{selectedSummary.alert_s1 || 0}</div>
-                        <div className="text-[10px] text-gray-500">S1</div>
+                      <div className="text-center p-2 bg-ds-surface2 rounded-lg">
+                        <div className="text-lg font-bold text-red-400">{selectedSummary.alert_s1 || 0}</div>
+                        <div className="text-[10px] text-ds-muted">S1</div>
                       </div>
-                      <div className="text-center p-2 bg-gray-50 rounded-lg">
-                        <div className="text-lg font-bold text-orange-500">{selectedSummary.alert_s2 || 0}</div>
-                        <div className="text-[10px] text-gray-500">S2</div>
+                      <div className="text-center p-2 bg-ds-surface2 rounded-lg">
+                        <div className="text-lg font-bold text-orange-400">{selectedSummary.alert_s2 || 0}</div>
+                        <div className="text-[10px] text-ds-muted">S2</div>
                       </div>
                     </div>
                   </div>
@@ -381,31 +400,31 @@ export default function ReportList() {
 
                 {/* 2. 执行状态卡片 */}
                 {(selectedReport.status === 'partial' || selectedReport.status === 'error' || selectedWarnings.length > 0 || selectedBlockResults.length > 0) && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">执行状态</h3>
+                  <div className="bg-ds-surface rounded-xl border border-ds-border p-5">
+                    <h3 className="text-sm font-semibold text-ds-text mb-3">执行状态</h3>
                     <div className="flex items-center gap-2 mb-3">
                       <Badge status={selectedReport.status} />
                       {selectedReport.error_message && (
-                        <span className="text-sm text-red-600">{selectedReport.error_message}</span>
+                        <span className="text-sm text-red-400">{selectedReport.error_message}</span>
                       )}
                     </div>
                     {selectedBlockResults.length > 0 && (
                       <div className="grid grid-cols-5 gap-2 mb-3">
                         {selectedBlockResults.map(br => (
-                          <div key={br.block} className="text-center p-2 bg-gray-50 rounded-lg">
-                            <div className="text-xs text-gray-500 mb-1 capitalize">{br.block}</div>
+                          <div key={br.block} className="text-center p-2 bg-ds-surface2 rounded-lg">
+                            <div className="text-xs text-ds-muted mb-1 capitalize">{br.block}</div>
                             <div className="text-sm font-medium">{blockStatusIcon(br.status)}</div>
                           </div>
                         ))}
                       </div>
                     )}
                     {selectedFailedBlocks.length > 0 && (
-                      <div className="text-sm text-red-600 mb-2">
+                      <div className="text-sm text-red-400 mb-2">
                         失败区块：{selectedFailedBlocks.join('、')}
                       </div>
                     )}
                     {selectedWarnings.length > 0 && (
-                      <div className="text-sm text-amber-600">
+                      <div className="text-sm text-amber-400">
                         <div className="font-medium mb-1">警告：</div>
                         <ul className="list-disc list-inside space-y-0.5">
                           {selectedWarnings.map((w, i) => (
@@ -419,21 +438,21 @@ export default function ReportList() {
 
                 {/* 3. 重点关注区块 */}
                 {selectedHighlights.length > 0 && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">重点关注</h3>
+                  <div className="bg-ds-surface rounded-xl border border-ds-border p-5">
+                    <h3 className="text-sm font-semibold text-ds-text mb-3">重点关注</h3>
                     <div className="space-y-2">
                       {selectedHighlights.map((h, i) => (
                         <div key={i} className={`flex items-start gap-2 p-2 rounded-lg ${
-                          h.level === 'critical' ? 'bg-red-50' : 'bg-orange-50'
+                          h.level === 'critical' ? 'bg-red-500/10' : 'bg-orange-500/10'
                         }`}>
                           <span className={`mt-0.5 text-xs font-bold px-1.5 py-0.5 rounded ${
-                            h.level === 'critical' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                            h.level === 'critical' ? 'bg-red-500/10 text-red-400' : 'bg-orange-500/10 text-orange-400'
                           }`}>
                             {h.level === 'critical' ? '严重' : '警告'}
                           </span>
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{h.title}</div>
-                            <div className="text-xs text-gray-500">{h.detail}</div>
+                            <div className="text-sm font-medium text-ds-text">{h.title}</div>
+                            <div className="text-xs text-ds-muted">{h.detail}</div>
                           </div>
                         </div>
                       ))}
@@ -443,9 +462,9 @@ export default function ReportList() {
 
                 {/* 4. 建议动作 */}
                 {selectedSuggestions.length > 0 && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">建议动作</h3>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
+                  <div className="bg-ds-surface rounded-xl border border-ds-border p-5">
+                    <h3 className="text-sm font-semibold text-ds-text mb-3">建议动作</h3>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-ds-muted">
                       {selectedSuggestions.map((s, i) => (
                         <li key={i}>{s}</li>
                       ))}
@@ -454,15 +473,15 @@ export default function ReportList() {
                 )}
 
                 {/* 5. Markdown 内容 */}
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="bg-ds-surface rounded-xl border border-ds-border overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-ds-border bg-ds-surface2">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">{selectedReport.project_name}</h3>
-                      <span className="text-xs text-gray-500">{selectedReport.report_date}</span>
+                      <h3 className="font-semibold text-ds-text">{selectedReport.project_name}</h3>
+                      <span className="text-xs text-ds-muted">{selectedReport.report_date}</span>
                     </div>
                     <button
                       onClick={handleCopyMarkdown}
-                      className="inline-flex items-center gap-1.5 text-sm text-gray-600 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="inline-flex items-center gap-1.5 text-sm text-ds-muted px-3 py-1.5 border border-ds-border rounded-lg hover:bg-ds-surface2 transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -472,15 +491,15 @@ export default function ReportList() {
                     </button>
                   </div>
                   <div className="px-5 py-4 max-h-[60vh] overflow-y-auto">
-                    <div className="prose prose-sm max-w-none prose-headings:text-gray-800 prose-table:text-sm">
+                    <div className="prose prose-sm max-w-none prose-headings:text-ds-text prose-table:text-sm">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
                     </div>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 flex items-center justify-center h-48">
-                <div className="text-center text-gray-400">
+              <div className="bg-ds-surface rounded-xl border border-ds-border flex items-center justify-center h-48">
+                <div className="text-center text-ds-muted">
                   <svg className="w-10 h-10 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

@@ -37,12 +37,12 @@ export default function TemplateList() {
       {/* 页面头 */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">模板管理</h1>
-          <p className="text-sm text-gray-500 mt-0.5">管理巡检指标模板，模板被项目引用后不可删除</p>
+          <h1 className="text-xl font-semibold text-ds-text">模板管理</h1>
+          <p className="text-sm text-ds-muted mt-0.5">管理巡检指标模板，模板被项目引用后不可删除</p>
         </div>
         <Link
           to="/templates/new"
-          className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -57,36 +57,36 @@ export default function TemplateList() {
           description="模板定义了巡检的指标和查询规则，先创建一个模板"
           action={
             <Link to="/templates/new"
-              className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover transition-colors"
             >
               创建第一个模板
             </Link>
           }
         />
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-ds-surface rounded-xl border border-ds-border overflow-hidden">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">ID</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">模板名称</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">创建时间</th>
+              <tr className="border-b border-ds-border bg-ds-surface2">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider w-16">ID</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">模板名称</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ds-muted uppercase tracking-wider">创建时间</th>
                 <th className="px-4 py-3 w-28" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-ds-border">
               {templates.map(t => (
-                <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-gray-400">{t.id}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{t.name}</td>
-                  <td className="px-4 py-3 text-gray-500">
+                <tr key={t.id} className="hover:bg-ds-surface2 transition-colors">
+                  <td className="px-4 py-3 text-ds-muted">{t.id}</td>
+                  <td className="px-4 py-3 font-medium text-ds-text">{t.name}</td>
+                  <td className="px-4 py-3 text-ds-muted">
                     {new Date(t.created_at).toLocaleString('zh-CN')}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <Link
                         to={`/templates/${t.id}/edit`}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs font-medium transition-colors"
+                        className="inline-flex items-center gap-1 px-2 py-1 text-ds-accent hover:bg-ds-accent/10 rounded text-xs font-medium transition-colors"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -98,13 +98,13 @@ export default function TemplateList() {
                         <span className="flex items-center gap-1">
                           <button
                             onClick={() => handleDelete(t.id)}
-                            className="px-2 py-1 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                            className="px-2 py-1 text-xs font-medium bg-red-500 text-ds-text rounded hover:bg-red-600 transition-colors"
                           >
                             确认
                           </button>
                           <button
                             onClick={() => setConfirmId(null)}
-                            className="px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                            className="px-2 py-1 text-xs font-medium text-ds-muted hover:bg-ds-surface2 rounded transition-colors"
                           >
                             取消
                           </button>
@@ -112,7 +112,7 @@ export default function TemplateList() {
                       ) : (
                         <button
                           onClick={() => setConfirmId(t.id)}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-red-500 hover:bg-red-50 rounded text-xs font-medium transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-red-400 hover:bg-red-500/10 rounded text-xs font-medium transition-colors"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
