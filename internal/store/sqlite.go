@@ -36,88 +36,71 @@ func Init(dbPath string) error {
 }
 
 func createTables() error {
-	templates := `
-	CREATE TABLE IF NOT EXISTS templates (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		content TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);`
+	schemas := []string{
+		`CREATE TABLE IF NOT EXISTS templates (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			content TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS projects (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			template_id INTEGER NOT NULL,
+			variables TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (template_id) REFERENCES templates(id)
+		);`,
+		`CREATE TABLE IF NOT EXISTS reports (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id INTEGER NOT NULL,
+			report_date TEXT NOT NULL,
+			data TEXT NOT NULL,
+			status TEXT DEFAULT 'pending',
+			error_message TEXT DEFAULT '',
+			failed_blocks TEXT DEFAULT '[]',
+			warnings TEXT DEFAULT '[]',
+			summary TEXT DEFAULT '{}',
+			block_results TEXT DEFAULT '[]',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+		);`,
+		`CREATE TABLE IF NOT EXISTS schedules (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			cron TEXT NOT NULL,
+			inspection_type TEXT DEFAULT 'daily',
+			enabled INTEGER DEFAULT 1,
+			notify_email TEXT DEFAULT '',
+			notify_wechat TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (project_id) REFERENCES projects(id)
+		);`,
+		`CREATE TABLE IF NOT EXISTS schedule_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			schedule_id INTEGER NOT NULL,
+			report_id INTEGER,
+			status TEXT,
+			notified_email INTEGER DEFAULT 0,
+			notified_wechat INTEGER DEFAULT 0,
+			error_message TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE
+		);`,
+	}
 
-	projects := `
-	CREATE TABLE IF NOT EXISTS projects (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		template_id INTEGER NOT NULL,
-		variables TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (template_id) REFERENCES templates(id)
-	);`
-
-	reports := `
-	CREATE TABLE IF NOT EXISTS reports (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		project_id INTEGER NOT NULL,
-		report_date TEXT NOT NULL,
-		data TEXT NOT NULL,
-		status TEXT DEFAULT 'pending',
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-	);`
-
-	for _, sql := range []string{templates, projects, reports} {
+	for _, sql := range schemas {
 		if _, err := DB.Exec(sql); err != nil {
 			return err
 		}
 	}
 
-	// 执行 v3 版本字段迁移
+	// 保留向后兼容：旧数据库启动时自动补充缺失字段
 	if err := migrateReportsV3(); err != nil {
 		return fmt.Errorf("failed to migrate reports table: %w", err)
 	}
 
-	// 创建定时任务相关表
-	if err := createScheduleTables(); err != nil {
-		return fmt.Errorf("failed to create schedule tables: %w", err)
-	}
-
-	return nil
-}
-
-func createScheduleTables() error {
-	schedules := `
-	CREATE TABLE IF NOT EXISTS schedules (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		project_id INTEGER NOT NULL,
-		name TEXT NOT NULL,
-		cron TEXT NOT NULL,
-		inspection_type TEXT DEFAULT 'daily',
-		enabled INTEGER DEFAULT 1,
-		notify_email TEXT DEFAULT '',
-		notify_wechat TEXT DEFAULT '',
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (project_id) REFERENCES projects(id)
-	);`
-
-	scheduleLogs := `
-	CREATE TABLE IF NOT EXISTS schedule_logs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		schedule_id INTEGER NOT NULL,
-		report_id INTEGER,
-		status TEXT,
-		notified_email INTEGER DEFAULT 0,
-		notified_wechat INTEGER DEFAULT 0,
-		error_message TEXT,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE
-	);`
-
-	for _, sql := range []string{schedules, scheduleLogs} {
-		if _, err := DB.Exec(sql); err != nil {
-			return err
-		}
-	}
-	log.Println("[migrate] schedule tables created")
 	return nil
 }
 

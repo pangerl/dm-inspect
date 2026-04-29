@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"dm-inspect/internal/config"
 	"dm-inspect/internal/handler"
@@ -21,8 +22,12 @@ func main() {
 	}
 	log.Printf("Config loaded: VM=%s, N9E=%s, N9EUser=%s", cfg.VMEndpoint, cfg.N9EEndpoint, cfg.N9EUser)
 
-	// 初始化 SQLite
-	if err := store.Init("./data.db"); err != nil {
+	// 初始化 SQLite（支持通过 DB_PATH 环境变量指定数据库路径）
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "./data.db"
+	}
+	if err := store.Init(dbPath); err != nil {
 		log.Fatalf("Failed to init database: %v", err)
 	}
 	defer store.Close()

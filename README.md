@@ -29,6 +29,8 @@
 | 告警/资产 | Nightingale (N9E) |
 | 定时调度 | robfig/cron/v3 |
 | 邮件发送 | jordan-wright/email + gomarkdown |
+| 容器化 | Docker + Docker Compose |
+| CI/CD | Jenkins |
 
 ## 快速开始
 
@@ -41,25 +43,40 @@ cp .env.example .env
 编辑 `.env`：
 
 ```env
+# 必填：VictoriaMetrics 与 Nightingale 接入信息
 vm_endpoint=http://192.168.5.151:8428
 n9e_endpoint=http://192.168.5.151:17000
 n9e_user=your_username
 n9e_pass=your_password
 
-# SMTP 配置（可选，用于定时任务邮件通知）
+# 可选：SMTP 邮件通知
 smtp_host=smtp.exmail.qq.com
 smtp_port=465
 smtp_user=alert@data-match.cn
 smtp_pass=your_smtp_password
 smtp_from=巡检系统 <alert@data-match.cn>
+
+# 可选：应用对外基础地址，用于邮件中的报告链接
 app_base_url=http://localhost:8090
+
+# 可选：SQLite 数据库路径（容器环境自动使用 /data/data.db）
+DB_PATH=./data.db
 ```
 
 ### 2. 构建并启动
 
+#### 方式一：二进制运行（开发/测试）
+
 ```bash
 make all    # 编译后端 + 构建前端
 make run    # 启动服务
+```
+
+#### 方式二：Docker Compose 部署（推荐生产环境）
+
+```bash
+# 确保 .env 已配置
+ docker-compose up -d --build
 ```
 
 访问 `http://localhost:8090`
@@ -227,9 +244,12 @@ dm-inspect/
 │       ├── ScheduleList.jsx
 │       ├── ScheduleEdit.jsx
 │       └── ReportList.jsx
-├── .docs/                       # 变更记录
+├── Dockerfile                   # 多阶段构建（前端 + Go + Alpine 运行）
+├── docker-compose.yml           # 生产环境一键部署
+├── Jenkinsfile                  # CI/CD 镜像构建与推送
 ├── Makefile
-└── .env.example
+├── .env.example
+└── .docs/                       # 变更记录
 ```
 
 ## 数据库
@@ -238,6 +258,37 @@ dm-inspect/
 - 报告保留：30 天（每次新增后异步清理）
 - 删除项目：级联删除关联报告
 - 删除定时任务：级联删除执行历史
+
+## 生产部署
+
+### Docker Compose（推荐）
+
+```bash
+# 构建并启动
+docker-compose up -d --build
+
+# 查看日志
+docker-compose logs -f dm-inspect
+
+# 停止
+docker-compose down
+```
+
+数据持久化：`./data/` 目录挂载到容器 `/data`，包含 SQLite 数据库及 WAL 文件。
+
+### Jenkins CI/CD
+
+项目根目录 `Jenkinsfile` 支持分支/Tag 构建：
+
+1. 选择分支或 Tag 触发构建
+2. 生成镜像 Tag：`YYYYMMDD-8位commit`
+3. 多阶段 Docker 构建并推送至阿里云容器仓库
+4. 企业微信通知构建结果
+
+**Jenkins 配置要点：**
+- Agent 标签：`it-jenkins-agent`
+- 必要参数：`DOCKER_REGISTRY_CREDENTIALS_ID`（镜像仓库凭据）
+- 根据实际环境修改 `SERVICE_NAME`、`GIT_URL`、`WEBHOOK_KEY`
 
 ## Makefile
 

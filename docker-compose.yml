@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  dm-inspect:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dm-inspect
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env
+    volumes:
+      # SQLite 数据持久化（包含 data.db、data.db-shm、data.db-wal）
+      - ./data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

@@ -20,6 +20,7 @@ web/dist/
 .claude/
 .playwright/
 .agents
+.docs/
 
 server
 design-system/
