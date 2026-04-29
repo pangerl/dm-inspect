@@ -6,10 +6,11 @@ pipeline {
             name: 'BRANCH',
             type: 'PT_BRANCH',
             defaultValue: 'main',
-            description: '请选择要构建的分支',
+            description: '请选择要构建的分支（首次构建可能无法列出分支，请先在 Job 配置中配置 SCM 或手动输入分支名如 origin/main）',
             branchFilter: '(.*)',
             sortMode: 'ASCENDING_SMART',
-            selectedValue: 'DEFAULT'
+            selectedValue: 'DEFAULT',
+            useRepository: 'http://gitlab.data-match.net:8929/it/dm-inspect.git'
         )
         gitParameter(
             name: 'TAG',
@@ -35,35 +36,49 @@ pipeline {
         // --- 回调接口配置 ---
         WEBHOOK_KEY = "07855d5b-d0db-46ee-b7a6-3b65e0106afe"
         WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WEBHOOK_KEY}"
+
+        // --- Git 仓库配置 ---
+        // 如果仓库地址不同，请修改此处
+        GIT_REPO_URL = "http://gitlab.data-match.net:8929/it/dm-inspect.git"
     }
 
     stages {
         stage('Checkout Code') {
             steps {
                 script {
+                    echo "========== 调试信息 =========="
+                    echo "params.TAG    = [${params.TAG}]"
+                    echo "params.BRANCH = [${params.BRANCH}]"
+                    echo "=============================="
+
                     def gitRef = ''
                     def refDesc = ''
 
                     if (params.TAG?.trim()) {
-                        gitRef = "refs/tags/${params.TAG}"
-                        refDesc = "TAG: ${params.TAG}"
+                        gitRef = "refs/tags/${params.TAG.trim()}"
+                        refDesc = "TAG: ${params.TAG.trim()}"
+                    } else if (params.BRANCH?.trim()) {
+                        def cleanBranch = params.BRANCH.trim().replaceAll('^origin/', '')
+                        gitRef = "*/${cleanBranch}"
+                        refDesc = "BRANCH: ${cleanBranch}"
                     } else {
-                        gitRef = "**/${params.BRANCH.replaceAll('origin/', '')}"
-                        refDesc = "BRANCH: ${params.BRANCH}"
+                        error "参数错误：BRANCH 和 TAG 均为空。如果是首次构建，请在 Jenkins Job 的 '参数化构建过程' 中先手动输入分支名（如 main 或 origin/main），或检查 Git 仓库地址是否正确。"
                     }
 
-                    echo "Checkout ${SERVICE_NAME} -> ${refDesc}"
+                    echo "Checkout ${SERVICE_NAME} -> ${refDesc} (gitRef=${gitRef})"
                     env.ACTUAL_BUILD_TARGET = refDesc
 
                     checkout([
                         $class: 'GitSCM',
                         branches: [[name: gitRef]],
                         userRemoteConfigs: [[
-                            url: "http://gitlab.data-match.net:8929/it/dm-inspect.git",
-                            credentialsId: '0c8fcb0a-8636-4f97-ae91-3dd2ed5b5212'
+                            url: env.GIT_REPO_URL,
+                            credentialsId: '0c8fcb0a-8636-4f97-ae91-3dd2ed5b5212',
+                            refspec: '+refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/remotes/origin/tags/*'
                         ]],
                         extensions: [
-                            [$class: 'CleanBeforeCheckout']
+                            [$class: 'CleanBeforeCheckout'],
+                            [$class: 'CloneOption', depth: 0, noTags: false, shallow: false]
                         ]
                     ])
                 }
@@ -186,7 +201,7 @@ def notifyWeChat(String statusEmoji, String statusText) {
 
 **项目名称：** ${env.JOB_BASE_NAME}
 **服务名称：** ${env.SERVICE_NAME}
-**仓库地址：** ${env.GIT_URL}
+**仓库地址：** ${env.GIT_REPO_URL}
 **代码分支：** ${env.ACTUAL_BUILD_TARGET}
 **镜像Tag：** ${env.FINAL_TAG}
 **镜像名称：** ${env.FULL_IMAGE_NAME}

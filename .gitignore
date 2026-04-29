@@ -5,9 +5,7 @@
 bin/
 
 # SQLite
-*.db
-data.db-shm
-data.db-wal
+data/
 
 # 前端
 web/node_modules/

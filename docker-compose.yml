@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   dm-inspect:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: crpi-ic1ao4fqbusgeli6.cn-hangzhou.personal.cr.aliyuncs.com/data-match/dm-inspect:20260429-c332bb68
     container_name: dm-inspect
     restart: unless-stopped
     ports:
