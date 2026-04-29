@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { Menu } from 'lucide-react'
+import { Menu, Sun, Moon } from 'lucide-react'
 import { ToastProvider } from './components/Toast'
+import { useTheme } from './components/ThemeProvider'
 import { Sheet, SheetContent, SheetTrigger } from './components/ui/sheet'
 import { Separator } from './components/ui/separator'
 import ProjectEdit from './pages/ProjectEdit'
@@ -20,6 +21,19 @@ const NAV_ITEMS = [
   { path: '/reports',   label: '巡检报告' },
 ]
 
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme()
+  return (
+    <button
+      onClick={toggleTheme}
+      className="p-2 rounded-full text-ds-muted hover:text-ds-text hover:bg-ds-surface2 transition-colors"
+      title={theme === 'light' ? '切换到深色模式' : '切换到浅色模式'}
+    >
+      {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+    </button>
+  )
+}
+
 function Logo() {
   return (
     <div className="flex items-center gap-2">
@@ -27,8 +41,8 @@ function Logo() {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
           d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
       </svg>
-      <span className="font-semibold text-ds-text tracking-wide font-heading">dm-inspect</span>
-      <span className="text-ds-muted text-sm ml-1 hidden sm:inline">巡检系统</span>
+      <span className="font-semibold text-ds-text tracking-tight-apple font-heading">dm-inspect</span>
+      <span className="text-ds-muted text-sm ml-1 hidden sm:inline font-body">巡检系统</span>
     </div>
   )
 }
@@ -63,7 +77,7 @@ function DesktopNav() {
             className={`flex items-center h-full px-4 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
               active
                 ? 'border-ds-accent text-ds-text'
-                : 'border-transparent text-ds-muted hover:text-ds-text hover:border-ds-muted'
+                : 'border-transparent text-ds-muted hover:text-ds-text hover:border-ds-border'
             }`}
           >
             {item.label}
@@ -107,10 +121,14 @@ function MobileNav() {
 
 function NavBar() {
   return (
-    <nav className="bg-ds-surface text-ds-text px-4 sm:px-6 h-14 flex items-center justify-between shrink-0 border-b border-ds-border">
+    <nav className="bg-ds-surface text-ds-text px-4 sm:px-6 h-14 flex items-center justify-between shrink-0 border-b border-ds-border sticky top-0 z-40 backdrop-blur-xl bg-opacity-80">
       <Logo />
-      <DesktopNav />
-      <MobileNav />
+      <div className="flex items-center gap-2">
+        <DesktopNav />
+        <div className="hidden md:block w-px h-6 bg-ds-border mx-2" />
+        <ThemeToggle />
+        <MobileNav />
+      </div>
     </nav>
   )
 }
@@ -121,7 +139,7 @@ export default function App() {
       <ToastProvider>
         <div className="min-h-screen bg-ds-bg flex flex-col">
           <NavBar />
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10">
             <Routes>
               <Route path="/" element={<Navigate to="/projects" replace />} />
               <Route path="/projects" element={<ProjectList />} />
@@ -137,7 +155,7 @@ export default function App() {
               <Route path="/schedules/:id/edit" element={<ScheduleEdit />} />
               <Route path="*" element={
                 <div className="flex flex-col items-center justify-center h-64 text-ds-muted">
-                  <p className="text-4xl font-bold mb-2">404</p>
+                  <p className="text-4xl font-bold mb-2 tracking-tight-apple">404</p>
                   <p>页面未找到</p>
                 </div>
               } />

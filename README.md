@@ -14,7 +14,7 @@
 - **模板校验**：保存时后端自动校验 YAML 格式，即时报错
 - **快速创建**：向导式三步流程，选择场景预设后填写 group 标签即可一键创建项目
 - **报告轮询**：巡检执行中自动每 5 秒刷新，完成后停止
-- **深色主题 UI**：OLED 级深色界面，基于 Tailwind 设计系统统一配色
+- **Apple 风格设计系统**：浅色/深色双主题切换，CSS 变量驱动，导航栏一键切换，localStorage 持久化偏好
 - **数据维护**：SQLite 存储，30 天自动清理
 
 ## 技术栈
@@ -23,7 +23,7 @@
 |------|------|
 | 后端 | Go + Gin |
 | 前端 | React 18 + TailwindCSS + Vite |
-| 设计系统 | 语义化 `ds-*` 命名空间（Background / Surface / Text / Muted / Border / Accent） |
+| 设计系统 | Apple 风格 CSS 变量 + Tailwind `ds-*` token，浅色/深色双主题 |
 | 数据库 | SQLite (WAL 模式) |
 | 指标 | VictoriaMetrics |
 | 告警/资产 | Nightingale (N9E) |
@@ -217,7 +217,7 @@ dm-inspect/
 │   └── store/sqlite.go          # SQLite 初始化 + 表结构
 ├── web/src/
 │   ├── api.js                   # 统一 API 封装
-│   ├── components/              # Toast / Badge / Spinner
+│   ├── components/              # Toast / Badge / Spinner / ThemeProvider
 │   └── pages/                   # 页面组件
 │       ├── ProjectList.jsx
 │       ├── ProjectEdit.jsx

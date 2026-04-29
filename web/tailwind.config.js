@@ -9,14 +9,14 @@ export default {
     extend: {
       colors: {
         ds: {
-          bg: '#020617',
-          surface: '#0F172A',
-          surface2: '#1E293B',
-          text: '#F8FAFC',
-          muted: '#94A3B8',
-          border: '#334155',
-          accent: '#22C55E',
-          'accent-hover': '#16A34A',
+          bg: 'var(--ds-bg)',
+          surface: 'var(--ds-surface)',
+          surface2: 'var(--ds-surface2)',
+          text: 'var(--ds-text)',
+          muted: 'var(--ds-muted)',
+          border: 'var(--ds-border)',
+          accent: 'var(--ds-accent)',
+          'accent-hover': 'var(--ds-accent-hover)',
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -58,9 +58,17 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        heading: ['"Fira Code"', 'monospace'],
-        body: ['"Fira Sans"', 'sans-serif'],
-      }
+        heading: ['"SF Pro Display"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        body: ['"SF Pro Text"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        mono: ['"SF Mono"', 'SFMono-Regular', 'ui-monospace', 'monospace'],
+      },
+      letterSpacing: {
+        'tight-apple': '-0.28px',
+        'tight-display': '-0.374px',
+      },
+      boxShadow: {
+        'product': 'rgba(0, 0, 0, 0.22) 3px 5px 30px 0',
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

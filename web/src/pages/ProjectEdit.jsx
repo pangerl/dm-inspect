@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { AlertTriangle, ChevronRight } from 'lucide-react'
 import { api } from '../api'
 import Spinner from '../components/Spinner'
 import { useToast } from '../components/Toast'
+import { Button } from '@/components/ui/button'
 
 export default function ProjectEdit() {
   const { id } = useParams()
@@ -65,36 +67,31 @@ export default function ProjectEdit() {
   return (
     <div className="max-w-lg">
       {/* 面包屑 */}
-      <div className="flex items-center gap-2 text-sm text-ds-muted mb-6">
-        <Link to="/projects" className="hover:text-ds-muted">巡检项目</Link>
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
+      <div className="flex items-center gap-2 text-sm text-ds-muted mb-8">
+        <Link to="/projects" className="hover:text-ds-text transition-colors">巡检项目</Link>
+        <ChevronRight className="w-4 h-4" />
         <span className="text-ds-text font-medium">{isEdit ? '编辑项目' : '创建项目'}</span>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-ds-surface rounded-xl border border-ds-border divide-y divide-ds-border">
-        <div className="px-6 py-5 space-y-5">
+      <form onSubmit={handleSubmit} className="bg-ds-surface rounded-[18px] border border-ds-border overflow-hidden">
+        <div className="px-6 py-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-ds-muted mb-1.5">项目名称</label>
+            <label className="block text-sm font-semibold text-ds-text mb-2">项目名称</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-ds-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-ds-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent transition-all"
               placeholder="例如：生产环境服务器"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ds-muted mb-1.5">巡检模板</label>
+            <label className="block text-sm font-semibold text-ds-text mb-2">巡检模板</label>
             {templates.length === 0 ? (
-              <p className="text-sm text-amber-400 flex items-center gap-1.5">
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+              <p className="text-sm text-red-500 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
                 暂无模板，请先
                 <Link to="/templates/new" className="underline text-ds-accent">创建模板</Link>
               </p>
@@ -102,7 +99,7 @@ export default function ProjectEdit() {
               <select
                 value={templateId}
                 onChange={e => setTemplateId(e.target.value)}
-                className="w-full px-3 py-2 border border-ds-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-ds-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent transition-all"
                 required
               >
                 {templates.map(t => (
@@ -113,40 +110,39 @@ export default function ProjectEdit() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ds-muted mb-1.5">
+            <label className="block text-sm font-semibold text-ds-text mb-2">
               巡检范围标签（group）
-              <span className="text-red-400 ml-0.5">*</span>
+              <span className="text-red-500 ml-0.5">*</span>
             </label>
             <input
               type="text"
               value={group}
               onChange={e => setGroup(e.target.value)}
-              className="w-full px-3 py-2 border border-ds-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-ds-border rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent transition-all"
               placeholder="例如：kuvera-prod"
               required
             />
-            <p className="mt-1.5 text-xs text-ds-muted">
+            <p className="mt-2 text-xs text-ds-muted leading-relaxed">
               这个值必须与 Nightingale 中机器的 group 标签完全一致，用于数据隔离
             </p>
           </div>
         </div>
 
-        <div className="px-6 py-4 flex items-center gap-3 bg-ds-surface2 rounded-b-xl">
-          <button
+        <div className="px-6 py-4 flex items-center gap-3 bg-ds-surface2 border-t border-ds-border">
+          <Button
             type="submit"
             disabled={saving || templates.length === 0}
-            className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
-            {saving && <span className="w-4 h-4 border-2 border-ds-text border-t-transparent rounded-full animate-spin" />}
+            {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
             {saving ? '保存中...' : '保存'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => navigate('/projects')}
-            className="text-sm font-medium text-ds-muted px-4 py-2 rounded-lg hover:bg-ds-surface2 transition-colors"
           >
             取消
-          </button>
+          </Button>
         </div>
       </form>
     </div>

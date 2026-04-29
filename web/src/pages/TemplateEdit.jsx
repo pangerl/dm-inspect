@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import { api } from '../api'
 import Spinner from '../components/Spinner'
 import { useToast } from '../components/Toast'
+import { Button } from '@/components/ui/button'
 
 // ── YAML <-> 基础模式配置 转换工具 ────────────────────────────
 
@@ -223,31 +225,29 @@ export default function TemplateEdit() {
   return (
     <div className="max-w-3xl">
       {/* 面包屑 */}
-      <div className="flex items-center gap-2 text-sm text-ds-muted mb-6">
-        <Link to="/templates" className="hover:text-ds-muted">模板管理</Link>
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
+      <div className="flex items-center gap-2 text-sm text-ds-muted mb-8">
+        <Link to="/templates" className="hover:text-ds-text transition-colors">模板管理</Link>
+        <ChevronRight className="w-4 h-4" />
         <span className="text-ds-text font-medium">{isEdit ? '编辑模板' : '创建模板'}</span>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-ds-surface rounded-xl border border-ds-border divide-y divide-ds-border">
+      <form onSubmit={handleSubmit} className="bg-ds-surface rounded-[18px] border border-ds-border overflow-hidden">
 
         {/* 预设选择器 */}
         {presets.length > 0 && (
-          <div className="px-6 py-4 bg-ds-accent/10 rounded-t-xl">
+          <div className="px-6 py-5 bg-ds-accent/5 border-b border-ds-border">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-ds-accent mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <div className="flex-1">
-                <p className="text-sm font-medium text-ds-text mb-1">从预设模板开始</p>
-                <p className="text-xs text-ds-accent mb-2.5">选择适合场景的预设，内容会自动填入，可在此基础上修改</p>
+                <p className="text-sm font-semibold text-ds-text mb-1">从预设模板开始</p>
+                <p className="text-xs text-ds-accent mb-3">选择适合场景的预设，内容会自动填入，可在此基础上修改</p>
                 <select
                   value={selectedPreset}
                   onChange={e => handlePresetChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-ds-accent rounded-lg text-sm bg-ds-surface focus:outline-none focus:ring-2 focus:ring-ds-accent"
+                  className="w-full px-4 py-2.5 border border-ds-accent/30 rounded-xl text-sm bg-ds-surface focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent transition-all"
                 >
                   <option value="">— 选择预设模板 —</option>
                   {presets.map(p => (
@@ -260,28 +260,28 @@ export default function TemplateEdit() {
         )}
 
         {/* 模板名称 */}
-        <div className="px-6 py-5">
-          <label className="block text-sm font-medium text-ds-muted mb-1.5">模板名称</label>
+        <div className="px-6 py-5 border-b border-ds-border">
+          <label className="block text-sm font-semibold text-ds-text mb-2">模板名称</label>
           <input
             type="text"
             value={name}
             onChange={e => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-ds-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-ds-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent transition-all"
             placeholder="例如：标准 Linux 服务器"
             required
           />
         </div>
 
         {/* 模式切换 */}
-        <div className="px-6 py-4 bg-ds-surface2">
+        <div className="px-6 py-4 bg-ds-surface2 border-b border-ds-border">
           <div className="flex items-center justify-between">
-            <div className="flex items-center bg-ds-surface rounded-lg border border-ds-border p-0.5">
+            <div className="flex items-center bg-ds-surface rounded-xl border border-ds-border p-0.5">
               <button
                 type="button"
                 onClick={() => handleModeChange('basic')}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                   mode === 'basic'
-                    ? 'bg-ds-accent text-ds-text'
+                    ? 'bg-ds-accent text-white'
                     : 'text-ds-muted hover:text-ds-text'
                 }`}
               >
@@ -290,9 +290,9 @@ export default function TemplateEdit() {
               <button
                 type="button"
                 onClick={() => handleModeChange('advanced')}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                   mode === 'advanced'
-                    ? 'bg-ds-accent text-ds-text'
+                    ? 'bg-ds-accent text-white'
                     : 'text-ds-muted hover:text-ds-text'
                 }`}
               >
@@ -309,7 +309,7 @@ export default function TemplateEdit() {
 
         {/* 基础模式内容 */}
         {mode === 'basic' && (
-          <div className="px-6 py-5 space-y-6">
+          <div className="px-6 py-6 space-y-8">
             {/* 磁盘路径 */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -317,7 +317,7 @@ export default function TemplateEdit() {
                 <button
                   type="button"
                   onClick={addDiskPath}
-                  className="text-xs text-ds-accent hover:text-ds-accent font-medium"
+                  className="text-xs text-ds-accent hover:text-ds-accent-hover font-medium"
                 >
                   + 添加路径
                 </button>
@@ -329,13 +329,13 @@ export default function TemplateEdit() {
                       type="text"
                       value={path}
                       onChange={e => updateDiskPath(idx, e.target.value)}
-                      className="flex-1 px-3 py-2 border border-ds-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent"
+                      className="flex-1 px-4 py-2.5 border border-ds-border rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent transition-all"
                       placeholder="例如：/data"
                     />
                     <button
                       type="button"
                       onClick={() => removeDiskPath(idx)}
-                      className="p-2 rounded text-ds-muted hover:text-red-400 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-400"
+                      className="p-2.5 rounded-xl text-ds-muted hover:text-red-500 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
                       title="删除"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -354,7 +354,7 @@ export default function TemplateEdit() {
             <div>
               <h4 className="text-sm font-semibold text-ds-text mb-3">中间件监控</h4>
               <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={basicConfig.middlewares.mysql}
@@ -366,7 +366,7 @@ export default function TemplateEdit() {
                   />
                   <span className="text-sm text-ds-muted">MySQL</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={basicConfig.middlewares.redis}
@@ -378,7 +378,7 @@ export default function TemplateEdit() {
                   />
                   <span className="text-sm text-ds-muted">Redis</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={basicConfig.middlewares.nacos}
@@ -396,8 +396,8 @@ export default function TemplateEdit() {
             {/* 容器统计 */}
             <div>
               <h4 className="text-sm font-semibold text-ds-text mb-3">容器统计</h4>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="space-y-2.5">
+                <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={basicConfig.container}
@@ -406,7 +406,7 @@ export default function TemplateEdit() {
                   />
                   <span className="text-sm text-ds-muted">统计运行中的容器数量</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={basicConfig.containerServices}
@@ -415,7 +415,7 @@ export default function TemplateEdit() {
                   />
                   <span className="text-sm text-ds-muted">采集容器服务详情（名称、镜像、状态）</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={basicConfig.containerPorts}
@@ -428,7 +428,7 @@ export default function TemplateEdit() {
             </div>
 
             {/* YAML 预览 */}
-            <div className="bg-ds-surface2 rounded-lg p-4">
+            <div className="bg-ds-surface2 rounded-[18px] p-5">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-ds-muted">自动生成的 YAML</span>
               </div>
@@ -440,16 +440,16 @@ export default function TemplateEdit() {
         {/* 高级模式内容 */}
         {mode === 'advanced' && (
           <div className="px-6 py-5">
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-sm font-medium text-ds-muted">YAML 配置</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold text-ds-text">YAML 配置</label>
               <span className="text-xs text-ds-muted">
-                使用 <code className="bg-ds-surface2 px-1 py-0.5 rounded font-mono">{'{{.group}}'}</code> 作为变量占位符
+                使用 <code className="bg-ds-surface2 px-1.5 py-0.5 rounded font-mono">{'{{.group}}'}</code> 作为变量占位符
               </span>
             </div>
             <textarea
               value={content}
               onChange={e => setContent(e.target.value)}
-              className="w-full px-3 py-2.5 border border-ds-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent resize-none"
+              className="w-full px-4 py-3 border border-ds-border rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent resize-none transition-all"
               rows={22}
               spellCheck={false}
               placeholder={`# 从上方选择预设，或手动填写 YAML 配置\n# 支持以下顶级字段：\n#   resources:                   磁盘使用率查询\n#   middlewares:                 中间件监控\n#   container_query:             容器运行数量统计\n#   container_services_query:    容器服务详情（名称、镜像、状态、启动时间）\n#   container_ports_query:       容器端口连通状态`}
@@ -459,22 +459,14 @@ export default function TemplateEdit() {
         )}
 
         {/* 操作按钮 */}
-        <div className="px-6 py-4 flex items-center gap-3 bg-ds-surface2 rounded-b-xl">
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-1.5 bg-ds-accent text-ds-text text-sm font-medium px-4 py-2 rounded-lg hover:bg-ds-accent-hover disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          >
-            {saving && <span className="w-4 h-4 border-2 border-ds-text border-t-transparent rounded-full animate-spin" />}
+        <div className="px-6 py-4 flex items-center gap-3 bg-ds-surface2 border-t border-ds-border">
+          <Button type="submit" disabled={saving}>
+            {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
             {saving ? '保存中...' : '保存'}
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/templates')}
-            className="text-sm font-medium text-ds-muted px-4 py-2 rounded-lg hover:bg-ds-surface2 transition-colors"
-          >
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => navigate('/templates')}>
             取消
-          </button>
+          </Button>
         </div>
       </form>
     </div>
