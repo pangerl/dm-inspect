@@ -18,7 +18,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/server
 
 # 阶段3：运行（最小化镜像）
 FROM alpine:latest
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=go-builder /app/server ./server
 COPY --from=go-builder /app/web/dist ./web/dist
