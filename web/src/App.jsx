@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Link, Route, Routes, useLocation } from 'react-router-dom'
 import { Menu, Sun, Moon } from 'lucide-react'
 import { ToastProvider } from './components/Toast'
 import { useTheme } from './components/ThemeProvider'
 import { Sheet, SheetContent, SheetTrigger } from './components/ui/sheet'
 import { Separator } from './components/ui/separator'
+import Home from './pages/Home'
 import ProjectEdit from './pages/ProjectEdit'
 import ProjectList from './pages/ProjectList'
 import ProjectQuickCreate from './pages/ProjectQuickCreate'
@@ -15,6 +16,7 @@ import TemplateEdit from './pages/TemplateEdit'
 import TemplateList from './pages/TemplateList'
 
 const NAV_ITEMS = [
+  { path: '/',          label: '首页' },
   { path: '/projects',  label: '巡检项目' },
   { path: '/templates', label: '模板管理' },
   { path: '/schedules', label: '定时任务' },
@@ -36,20 +38,26 @@ function ThemeToggle() {
 
 function Logo() {
   return (
-    <div className="flex items-center gap-2">
+    <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
       <svg className="w-6 h-6 text-ds-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
           d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
       </svg>
       <span className="font-semibold text-ds-text tracking-tight-apple font-heading">dm-inspect</span>
       <span className="text-ds-muted text-sm ml-1 hidden sm:inline font-body">巡检系统</span>
-    </div>
+    </Link>
   )
+}
+
+function isActive(location, path) {
+  // 首页使用精确匹配，避免在其他页面被误高亮
+  if (path === '/') return location.pathname === '/'
+  return location.pathname.startsWith(path)
 }
 
 function NavLink({ item, className, onClick }) {
   const location = useLocation()
-  const active = location.pathname.startsWith(item.path)
+  const active = isActive(location, item.path)
   return (
     <Link
       key={item.path}
@@ -69,7 +77,7 @@ function DesktopNav() {
   return (
     <div className="hidden md:flex items-center h-full">
       {NAV_ITEMS.map(item => {
-        const active = location.pathname.startsWith(item.path)
+        const active = isActive(location, item.path)
         return (
           <Link
             key={item.path}
@@ -141,7 +149,7 @@ export default function App() {
           <NavBar />
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10">
             <Routes>
-              <Route path="/" element={<Navigate to="/projects" replace />} />
+              <Route path="/" element={<Home />} />
               <Route path="/projects" element={<ProjectList />} />
               <Route path="/projects/quick-new" element={<ProjectQuickCreate />} />
               <Route path="/projects/new" element={<ProjectEdit />} />
