@@ -17,10 +17,14 @@ func Logger() gin.HandlerFunc {
 		// 处理请求
 		c.Next()
 
-		// 记录日志
+		// 记录日志（跳过 Docker healthcheck，避免刷屏）
+		clientIP := c.ClientIP()
+		if method == "GET" && path == "/" && (clientIP == "127.0.0.1" || clientIP == "::1") {
+			return
+		}
+
 		latency := time.Since(start)
 		status := c.Writer.Status()
-		clientIP := c.ClientIP()
 
 		log.Printf("[%s] %s %s %d %v %s",
 			method,
