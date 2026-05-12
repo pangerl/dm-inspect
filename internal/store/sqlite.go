@@ -138,6 +138,7 @@ func migrateReportsV3() error {
 		{"warnings", "ALTER TABLE reports ADD COLUMN warnings TEXT DEFAULT '[]'"},
 		{"summary", "ALTER TABLE reports ADD COLUMN summary TEXT DEFAULT '{}'"},
 		{"block_results", "ALTER TABLE reports ADD COLUMN block_results TEXT DEFAULT '[]'"},
+		{"changes", "ALTER TABLE reports ADD COLUMN changes TEXT DEFAULT '[]'"},
 	}
 
 	for _, col := range columns {

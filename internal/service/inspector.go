@@ -403,7 +403,18 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 	warningsJSON, _ := json.Marshal(warnings)
 	failedBlocksJSON, _ := json.Marshal(failedBlocksList)
 
-	// 10. 组装报告对象
+	// 10. 变化检测：与昨日报告对比
+	yesterdayDate := calcYesterday(reportDate)
+	var changes []model.ReportChange
+	if yestReport, err := i.GetProjectReport(projectID, yesterdayDate); err == nil && yestReport != nil {
+		var yestData model.ReportData
+		if err := json.Unmarshal([]byte(yestReport.Data), &yestData); err == nil {
+			changes = CompareReports(reportData, yestData)
+		}
+	}
+	changesJSON, _ := json.Marshal(changes)
+
+	// 11. 组装报告对象
 	report.Data = string(dataJSON)
 	report.Status = finalStatus
 	report.FailedBlocks = string(failedBlocksJSON)
@@ -412,6 +423,7 @@ func (i *Inspector) Execute(ctx context.Context, projectID int64, reportDate str
 	report.BlockResults = string(blockResultsJSON)
 	report.Highlights = string(highlightsJSON)
 	report.Suggestions = string(suggestionsJSON)
+	report.Changes = string(changesJSON)
 
 	// 主错误信息：取第一个失败的区块信息
 	if len(failedBlocksList) > 0 {
@@ -715,6 +727,16 @@ func (i *Inspector) calcTimeWindow(reportDate string) (int64, int64, error) {
 	return start.Unix(), end.Unix(), nil
 }
 
+// calcYesterday 计算 reportDate 的前一天，格式 YYYY-MM-DD
+func calcYesterday(reportDate string) string {
+	t, err := time.Parse("2006-01-02", reportDate)
+	if err != nil {
+		log.Printf("[warn] calcYesterday: 无法解析日期 %q: %v", reportDate, err)
+		return ""
+	}
+	return t.AddDate(0, 0, -1).Format("2006-01-02")
+}
+
 func (i *Inspector) loadProject(projectID int64) (*model.Project, error) {
 	var p model.Project
 	err := store.DB.QueryRow(
@@ -768,10 +790,11 @@ func (i *Inspector) updateReport(report *model.Report) error {
 			failed_blocks = ?,
 			warnings = ?,
 			summary = ?,
-			block_results = ?
+			block_results = ?,
+			changes = ?
 		WHERE id = ?
 	`, report.Data, report.Status, report.ErrorMessage, report.FailedBlocks,
-		report.Warnings, report.Summary, report.BlockResults, report.ID)
+		report.Warnings, report.Summary, report.BlockResults, report.Changes, report.ID)
 	return err
 }
 

@@ -127,14 +127,14 @@ func GetReport(c *gin.Context) {
 	var r ReportWithProject
 	err = store.DB.QueryRow(`
 		SELECT r.id, r.project_id, r.report_date, r.data, r.status, r.created_at,
-		       r.error_message, r.failed_blocks, r.warnings, r.summary, r.block_results,
+		       r.error_message, r.failed_blocks, r.warnings, r.summary, r.block_results, r.changes,
 		       p.name as project_name
 		FROM reports r
 		LEFT JOIN projects p ON r.project_id = p.id
 		WHERE r.id = ?
 	`, id).Scan(
 		&r.ID, &r.ProjectID, &r.ReportDate, &r.Data, &r.Status, &r.CreatedAt,
-		&r.ErrorMessage, &r.FailedBlocks, &r.Warnings, &r.Summary, &r.BlockResults,
+		&r.ErrorMessage, &r.FailedBlocks, &r.Warnings, &r.Summary, &r.BlockResults, &r.Changes,
 		&r.ProjectName,
 	)
 	if err != nil {
@@ -207,7 +207,7 @@ func GetReportMarkdown(c *gin.Context) {
 	}
 	group := varsMap["group"]
 
-	md := service.GenerateMarkdown(r.ProjectName, group, r.ReportDate, r.Status, r.ErrorMessage, r.FailedBlocks, r.Warnings, r.Summary, r.BlockResults, reportData)
+	md := service.GenerateMarkdown(r.ProjectName, group, r.ReportDate, r.Status, r.ErrorMessage, r.FailedBlocks, r.Warnings, r.Summary, r.BlockResults, r.Changes, reportData)
 	c.Header("Content-Type", "text/markdown; charset=utf-8")
 	c.String(http.StatusOK, md)
 }

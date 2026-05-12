@@ -192,6 +192,7 @@ export default function ReportList() {
   const selectedBlockResults = useMemo(() => selectedReport ? safeParse(selectedReport.block_results, []) : [], [selectedReport])
   const selectedHighlights = useMemo(() => selectedReport ? safeParse(selectedReport.highlights, []) : [], [selectedReport])
   const selectedSuggestions = useMemo(() => selectedReport ? safeParse(selectedReport.suggestions, []) : [], [selectedReport])
+  const selectedChanges = useMemo(() => selectedReport ? safeParse(selectedReport.changes, []) : [], [selectedReport])
 
   const blockStatusIcon = (status) => {
     if (status === 'success') return <Check className="w-4 h-4 text-ds-accent" />
@@ -527,7 +528,43 @@ export default function ReportList() {
                   </div>
                 )}
 
-                {/* 5. Markdown 内容 */}
+                {/* 5. 变化检测 */}
+                {selectedChanges.length > 0 && (
+                  <div className="bg-ds-surface rounded-[18px] border border-ds-border p-5">
+                    <h3 className="text-sm font-semibold text-ds-text mb-4">变化检测（与昨日对比）</h3>
+                    <div className="space-y-2">
+                      {selectedChanges.map((c, i) => {
+                        const iconMap = {
+                          added: '🟢',
+                          removed: '🔴',
+                          changed: '🟡',
+                          trend: '🔵'
+                        }
+                        const categoryMap = {
+                          server: '服务器',
+                          container: '容器',
+                          middleware: '中间件',
+                          disk: '磁盘',
+                          alert: '告警'
+                        }
+                        return (
+                          <div key={i} className="flex items-start gap-2 p-3 rounded-xl bg-ds-surface2">
+                            <span className="mt-0.5 text-sm">{iconMap[c.type] || '●'}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-ds-text">{c.title}</div>
+                              <div className="text-xs text-ds-muted mt-0.5">{c.detail}</div>
+                            </div>
+                            <span className="text-[10px] text-ds-muted bg-ds-border/50 px-2 py-0.5 rounded-full shrink-0">
+                              {categoryMap[c.category] || c.category}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. Markdown 内容 */}
                 <div className="bg-ds-surface rounded-[18px] border border-ds-border overflow-hidden">
                   <div className="flex items-center justify-between px-5 py-4 border-b border-ds-border bg-ds-surface2">
                     <div className="flex items-center gap-2">

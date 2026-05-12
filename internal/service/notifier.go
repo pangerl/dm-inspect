@@ -167,7 +167,7 @@ func (n *Notifier) AsyncNotify(projectName string, group string, reportDate stri
 				var reportData model.ReportData
 				if err := json.Unmarshal([]byte(report.Data), &reportData); err == nil {
 					md := GenerateMarkdown(projectName, group, reportDate, report.Status, report.ErrorMessage,
-						report.FailedBlocks, report.Warnings, report.Summary, report.BlockResults, reportData)
+						report.FailedBlocks, report.Warnings, report.Summary, report.BlockResults, report.Changes, reportData)
 					subject := fmt.Sprintf("[巡检报告] %s - %s", projectName, reportDate)
 					if err := n.SendEmail(toAddrs, subject, md); err != nil {
 						log.Printf("[notify] 邮件发送失败: %v", err)

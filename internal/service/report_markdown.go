@@ -11,7 +11,7 @@ import (
 )
 
 // GenerateMarkdown 生成巡检报告的 Markdown 文本
-func GenerateMarkdown(projectName, group, reportDate, status, errorMessage, failedBlocksJSON, warningsJSON, summaryJSON, blockResultsJSON string, data model.ReportData) string {
+func GenerateMarkdown(projectName, group, reportDate, status, errorMessage, failedBlocksJSON, warningsJSON, summaryJSON, blockResultsJSON, changesJSON string, data model.ReportData) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("# 巡检报告 - %s\n\n", projectName))
@@ -52,6 +52,33 @@ func GenerateMarkdown(projectName, group, reportDate, status, errorMessage, fail
 		sb.WriteString(fmt.Sprintf("- 中间件异常: %d\n", summary.MiddlewareAbnormal))
 		sb.WriteString(fmt.Sprintf("- 告警 S1/S2/S3: %d/%d/%d\n", summary.AlertS1, summary.AlertS2, summary.AlertS3))
 		sb.WriteString("\n")
+	}
+
+	// 变化检测
+	var changes []model.ReportChange
+	if err := json.Unmarshal([]byte(changesJSON), &changes); err == nil && len(changes) > 0 {
+		sb.WriteString("**变化检测**（与昨日对比）:\n")
+		for _, c := range changes {
+			icon := "●"
+			switch c.Type {
+			case "added":
+				icon = "🟢"
+			case "removed":
+				icon = "🔴"
+			case "changed":
+				icon = "🟡"
+			case "trend":
+				icon = "🔵"
+			}
+			sb.WriteString(fmt.Sprintf("- %s **%s**：%s", icon, c.Title, c.Detail))
+			if c.Before != "" && c.After != "" {
+				sb.WriteString(fmt.Sprintf("（%s → %s）", c.Before, c.After))
+			}
+			sb.WriteString("\n")
+		}
+		sb.WriteString("\n")
+	} else {
+		sb.WriteString("**变化检测**：与昨日相比无显著变化\n\n")
 	}
 
 	suggestions := BuildSuggestions(&summary)

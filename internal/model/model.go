@@ -34,6 +34,7 @@ type Report struct {
 	BlockResults  string    `json:"block_results"`          // JSON: []BlockResult
 	Highlights    string    `json:"highlights,omitempty"`   // JSON: []Highlight，运行时组装
 	Suggestions   string    `json:"suggestions,omitempty"`  // JSON: []string，运行时组装
+	Changes       string    `json:"changes,omitempty"`      // JSON: []ReportChange
 	CreatedAt     time.Time `json:"created_at"`
 }
 
@@ -129,6 +130,16 @@ type Summary struct {
 	AlertS1             int `json:"alert_s1"`
 	AlertS2             int `json:"alert_s2"`
 	AlertS3             int `json:"alert_s3"`
+}
+
+// ReportChange 单条变化记录
+type ReportChange struct {
+	Type     string `json:"type"`     // added / removed / changed / trend
+	Category string `json:"category"` // server / container / middleware / disk / alert
+	Title    string `json:"title"`    // 展示文案
+	Detail   string `json:"detail"`   // 详细说明
+	Before   string `json:"before"`   // 变化前值
+	After    string `json:"after"`    // 变化后值
 }
 
 // Highlight 重点关注项
