@@ -53,8 +53,8 @@ export default function ScheduleList() {
       .catch(err => toast.error(err.message))
   }
 
-  const openLogs = (id) => {
-    setLogModal({ scheduleId: id, logs: [], loading: true })
+  const openLogs = (id, projectId) => {
+    setLogModal({ scheduleId: id, projectId, logs: [], loading: true })
     api.get(`/schedules/${id}/logs`)
       .then(data => {
         setLogModal(prev => ({ ...prev, logs: data || [], loading: false }))
@@ -168,7 +168,7 @@ export default function ScheduleList() {
                         >
                           <Play className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openLogs(s.id)}
+                        <Button variant="ghost" size="icon" onClick={() => openLogs(s.id, s.project_id)}
                           className="text-ds-muted hover:text-ds-accent h-8 w-8"
                           title="执行历史"
                         >
@@ -245,7 +245,7 @@ export default function ScheduleList() {
                       <Play className="w-3.5 h-3.5 mr-1" />
                       执行
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => openLogs(s.id)}
+                    <Button variant="ghost" size="sm" onClick={() => openLogs(s.id, s.project_id)}
                       className="text-ds-muted hover:text-ds-accent h-8 px-2 flex-1"
                     >
                       <Clock className="w-3.5 h-3.5 mr-1" />
@@ -299,7 +299,7 @@ export default function ScheduleList() {
                             {log.status === 'success' ? '成功' : '失败'}
                           </span>
                           {log.report_id > 0 && (
-                            <Link to={`/reports?project_id=&date=&status=`} className="text-xs text-ds-accent hover:underline">
+                            <Link to={`/reports?project_id=${logModal.projectId}`} className="text-xs text-ds-accent hover:underline">
                               报告 #{log.report_id}
                             </Link>
                           )}
