@@ -162,6 +162,7 @@ type Schedule struct {
 	NotificationConfigName string    `json:"notification_config_name,omitempty"`
 	NotifyEmail            string    `json:"notify_email"`  // 逗号分隔多个邮箱
 	NotifyWechat           string    `json:"notify_wechat"` // 企业微信 webhook URL
+	NotifyFeishu           string    `json:"notify_feishu"` // 飞书 webhook URL
 	CreatedAt              time.Time `json:"created_at"`
 }
 
@@ -171,6 +172,7 @@ type NotificationConfig struct {
 	Name         string    `json:"name"`
 	NotifyEmail  string    `json:"notify_email"`  // 逗号分隔多个邮箱
 	NotifyWechat string    `json:"notify_wechat"` // 企业微信 webhook URL
+	NotifyFeishu string    `json:"notify_feishu"` // 飞书 webhook URL
 	Enabled      bool      `json:"enabled"`
 	CreatedAt    time.Time `json:"created_at"`
 }
@@ -183,6 +185,7 @@ type ScheduleLog struct {
 	Status         string    `json:"status"`          // success / failed
 	NotifiedEmail  bool      `json:"notified_email"`
 	NotifiedWechat bool      `json:"notified_wechat"`
+	NotifiedFeishu bool      `json:"notified_feishu"`
 	ErrorMessage   string    `json:"error_message"`
 	CreatedAt      time.Time `json:"created_at"`
 }

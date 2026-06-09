@@ -14,7 +14,7 @@ import (
 // ListNotificationConfigs 获取通知配置列表
 func ListNotificationConfigs(c *gin.Context) {
 	rows, err := store.DB.Query(`
-		SELECT id, name, notify_email, notify_wechat, enabled, created_at
+		SELECT id, name, notify_email, notify_wechat, notify_feishu, enabled, created_at
 		FROM notification_configs
 		ORDER BY id DESC
 	`)
@@ -28,7 +28,7 @@ func ListNotificationConfigs(c *gin.Context) {
 	for rows.Next() {
 		var cfg model.NotificationConfig
 		var enabled int
-		if err := rows.Scan(&cfg.ID, &cfg.Name, &cfg.NotifyEmail, &cfg.NotifyWechat, &enabled, &cfg.CreatedAt); err != nil {
+		if err := rows.Scan(&cfg.ID, &cfg.Name, &cfg.NotifyEmail, &cfg.NotifyWechat, &cfg.NotifyFeishu, &enabled, &cfg.CreatedAt); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan notification config"})
 			return
 		}
@@ -54,15 +54,15 @@ func CreateNotificationConfig(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name 为必填字段"})
 		return
 	}
-	if cfg.NotifyEmail == "" && cfg.NotifyWechat == "" {
+	if cfg.NotifyEmail == "" && cfg.NotifyWechat == "" && cfg.NotifyFeishu == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "至少填写一种通知渠道"})
 		return
 	}
 
 	result, err := store.DB.Exec(`
-		INSERT INTO notification_configs (name, notify_email, notify_wechat, enabled)
-		VALUES (?, ?, ?, ?)
-	`, cfg.Name, cfg.NotifyEmail, cfg.NotifyWechat, boolToInt(cfg.Enabled))
+		INSERT INTO notification_configs (name, notify_email, notify_wechat, notify_feishu, enabled)
+		VALUES (?, ?, ?, ?, ?)
+	`, cfg.Name, cfg.NotifyEmail, cfg.NotifyWechat, cfg.NotifyFeishu, boolToInt(cfg.Enabled))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create notification config"})
 		return
@@ -106,16 +106,16 @@ func UpdateNotificationConfig(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name 为必填字段"})
 		return
 	}
-	if cfg.NotifyEmail == "" && cfg.NotifyWechat == "" {
+	if cfg.NotifyEmail == "" && cfg.NotifyWechat == "" && cfg.NotifyFeishu == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "至少填写一种通知渠道"})
 		return
 	}
 
 	result, err := store.DB.Exec(`
 		UPDATE notification_configs
-		SET name = ?, notify_email = ?, notify_wechat = ?, enabled = ?
+		SET name = ?, notify_email = ?, notify_wechat = ?, notify_feishu = ?, enabled = ?
 		WHERE id = ?
-	`, cfg.Name, cfg.NotifyEmail, cfg.NotifyWechat, boolToInt(cfg.Enabled), id)
+	`, cfg.Name, cfg.NotifyEmail, cfg.NotifyWechat, cfg.NotifyFeishu, boolToInt(cfg.Enabled), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update notification config"})
 		return
@@ -164,10 +164,10 @@ func findNotificationConfig(id int64) (*model.NotificationConfig, error) {
 	var cfg model.NotificationConfig
 	var enabled int
 	err := store.DB.QueryRow(`
-		SELECT id, name, notify_email, notify_wechat, enabled, created_at
+		SELECT id, name, notify_email, notify_wechat, notify_feishu, enabled, created_at
 		FROM notification_configs
 		WHERE id = ?
-	`, id).Scan(&cfg.ID, &cfg.Name, &cfg.NotifyEmail, &cfg.NotifyWechat, &enabled, &cfg.CreatedAt)
+	`, id).Scan(&cfg.ID, &cfg.Name, &cfg.NotifyEmail, &cfg.NotifyWechat, &cfg.NotifyFeishu, &enabled, &cfg.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, err

@@ -32,7 +32,7 @@ func ListSchedules(c *gin.Context) {
 		SELECT s.id, s.project_id, s.name, s.cron, s.inspection_type, s.enabled,
 		       COALESCE(s.notification_config_id, 0), COALESCE(n.name, ''),
 		       COALESCE(n.notify_email, s.notify_email, ''), COALESCE(n.notify_wechat, s.notify_wechat, ''),
-		       s.created_at, p.name as project_name
+		       COALESCE(n.notify_feishu, ''), s.created_at, p.name as project_name
 		FROM schedules s
 		LEFT JOIN projects p ON s.project_id = p.id
 		LEFT JOIN notification_configs n ON s.notification_config_id = n.id
@@ -57,7 +57,7 @@ func ListSchedules(c *gin.Context) {
 		if err := rows.Scan(
 			&s.ID, &s.ProjectID, &s.Name, &s.Cron, &s.InspectionType, &enabled,
 			&s.NotificationConfigID, &s.NotificationConfigName,
-			&s.NotifyEmail, &s.NotifyWechat, &s.CreatedAt, &s.ProjectName,
+			&s.NotifyEmail, &s.NotifyWechat, &s.NotifyFeishu, &s.CreatedAt, &s.ProjectName,
 		); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan schedule"})
 			return
@@ -131,13 +131,14 @@ func GetSchedule(c *gin.Context) {
 		SELECT s.id, s.project_id, s.name, s.cron, s.inspection_type, s.enabled,
 		       s.notification_config_id, n.name,
 		       COALESCE(n.notify_email, s.notify_email, ''),
-		       COALESCE(n.notify_wechat, s.notify_wechat, ''), s.created_at
+		       COALESCE(n.notify_wechat, s.notify_wechat, ''),
+		       COALESCE(n.notify_feishu, ''), s.created_at
 		FROM schedules s
 		LEFT JOIN notification_configs n ON s.notification_config_id = n.id
 		WHERE s.id = ?
 	`, id).Scan(
 		&s.ID, &s.ProjectID, &s.Name, &s.Cron, &s.InspectionType, &enabled,
-		&notificationConfigID, &notificationConfigName, &s.NotifyEmail, &s.NotifyWechat, &s.CreatedAt,
+		&notificationConfigID, &notificationConfigName, &s.NotifyEmail, &s.NotifyWechat, &s.NotifyFeishu, &s.CreatedAt,
 	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found"})
@@ -253,7 +254,7 @@ func ListScheduleLogs(c *gin.Context) {
 	}
 
 	rows, err := store.DB.Query(`
-		SELECT id, schedule_id, report_id, status, notified_email, notified_wechat, error_message, created_at
+		SELECT id, schedule_id, report_id, status, notified_email, notified_wechat, notified_feishu, error_message, created_at
 		FROM schedule_logs
 		WHERE schedule_id = ?
 		ORDER BY id DESC
@@ -268,16 +269,17 @@ func ListScheduleLogs(c *gin.Context) {
 	var logs []model.ScheduleLog
 	for rows.Next() {
 		var l model.ScheduleLog
-		var email, wechat int
+		var email, wechat, feishu int
 		if err := rows.Scan(
 			&l.ID, &l.ScheduleID, &l.ReportID, &l.Status,
-			&email, &wechat, &l.ErrorMessage, &l.CreatedAt,
+			&email, &wechat, &feishu, &l.ErrorMessage, &l.CreatedAt,
 		); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan log"})
 			return
 		}
 		l.NotifiedEmail = email == 1
 		l.NotifiedWechat = wechat == 1
+		l.NotifiedFeishu = feishu == 1
 		logs = append(logs, l)
 	}
 	if err := rows.Err(); err != nil {

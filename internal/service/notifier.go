@@ -101,6 +101,51 @@ func (n *Notifier) SendWechat(webhookURL string, projectName string, reportDate 
 	return nil
 }
 
+// SendFeishu 发送飞书机器人通知
+func (n *Notifier) SendFeishu(webhookURL string, projectName string, reportDate string, reportID int64, summary *model.Summary) error {
+	if webhookURL == "" {
+		return fmt.Errorf("webhook URL 为空")
+	}
+
+	content := n.buildFeishuMessage(projectName, reportDate, reportID, summary)
+	payload := map[string]interface{}{
+		"msg_type": "text",
+		"content": map[string]string{
+			"text": content,
+		},
+	}
+
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(webhookURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("飞书请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("飞书返回状态码 %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Code       int    `json:"code"`
+		Msg        string `json:"msg"`
+		StatusCode int    `json:"StatusCode"`
+		StatusMsg  string `json:"StatusMessage"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("解析飞书响应失败: %w", err)
+	}
+	if result.Code != 0 || result.StatusCode != 0 {
+		msg := result.Msg
+		if msg == "" {
+			msg = result.StatusMsg
+		}
+		return fmt.Errorf("飞书发送失败: %s", msg)
+	}
+
+	return nil
+}
+
 // buildWechatMessage 构造企业微信机器人消息内容
 func (n *Notifier) buildWechatMessage(projectName, reportDate string, reportID int64, summary *model.Summary) string {
 	var sb strings.Builder
@@ -122,6 +167,30 @@ func (n *Notifier) buildWechatMessage(projectName, reportDate string, reportID i
 		reportURL = fmt.Sprintf("/api/reports/%d/markdown", reportID)
 	}
 	sb.WriteString(fmt.Sprintf("[查看完整报告](%s)", reportURL))
+
+	return sb.String()
+}
+
+// buildFeishuMessage 构造飞书机器人文本消息内容
+func (n *Notifier) buildFeishuMessage(projectName, reportDate string, reportID int64, summary *model.Summary) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("巡检报告 - %s\n", projectName))
+	sb.WriteString(fmt.Sprintf("巡检日期: %s\n", reportDate))
+	sb.WriteString("执行状态: 已完成\n")
+
+	if summary != nil {
+		sb.WriteString("\n异常摘要:\n")
+		sb.WriteString(fmt.Sprintf("- 离线服务器: %d\n", summary.OfflineServers))
+		sb.WriteString(fmt.Sprintf("- 磁盘风险: %d\n", summary.DiskCritical))
+		sb.WriteString(fmt.Sprintf("- 中间件异常: %d\n", summary.MiddlewareAbnormal))
+		sb.WriteString(fmt.Sprintf("- 告警 S1/S2/S3: %d/%d/%d\n", summary.AlertS1, summary.AlertS2, summary.AlertS3))
+	}
+
+	reportURL := fmt.Sprintf("%s/api/reports/%d/markdown", n.appBaseURL, reportID)
+	if n.appBaseURL == "" {
+		reportURL = fmt.Sprintf("/api/reports/%d/markdown", reportID)
+	}
+	sb.WriteString(fmt.Sprintf("\n查看完整报告: %s", reportURL))
 
 	return sb.String()
 }
@@ -158,8 +227,8 @@ code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; font-size: 12p
 	return []byte(result)
 }
 
-// AsyncNotify 异步执行邮件和企业微信通知，失败仅记录日志不阻塞
-func (n *Notifier) AsyncNotify(projectName string, group string, reportDate string, report *model.Report, notifyEmail string, notifyWechat string) {
+// AsyncNotify 异步执行通知，失败仅记录日志不阻塞
+func (n *Notifier) AsyncNotify(projectName string, group string, reportDate string, report *model.Report, notifyEmail string, notifyWechat string, notifyFeishu string) {
 	go func() {
 		if notifyEmail != "" && n.smtp != nil {
 			toAddrs := parseEmailAddrs(notifyEmail)
@@ -187,6 +256,18 @@ func (n *Notifier) AsyncNotify(projectName string, group string, reportDate stri
 				log.Printf("[notify] 企业微信发送失败: %v", err)
 			} else {
 				log.Printf("[notify] 企业微信已发送")
+			}
+		}
+	}()
+
+	go func() {
+		if notifyFeishu != "" {
+			var summary model.Summary
+			json.Unmarshal([]byte(report.Summary), &summary)
+			if err := n.SendFeishu(notifyFeishu, projectName, reportDate, report.ID, &summary); err != nil {
+				log.Printf("[notify] 飞书发送失败: %v", err)
+			} else {
+				log.Printf("[notify] 飞书已发送")
 			}
 		}
 	}()

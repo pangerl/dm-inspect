@@ -152,17 +152,18 @@ func (m *ScheduleManager) runSchedule(scheduleID int64) {
 		SELECT s.id, s.project_id, s.name, s.cron, s.inspection_type, s.enabled,
 		       COALESCE(s.notification_config_id, 0), COALESCE(n.name, ''),
 		       CASE WHEN COALESCE(n.enabled, 1) = 1 THEN COALESCE(n.notify_email, s.notify_email, '') ELSE '' END,
-		       CASE WHEN COALESCE(n.enabled, 1) = 1 THEN COALESCE(n.notify_wechat, s.notify_wechat, '') ELSE '' END
+		       CASE WHEN COALESCE(n.enabled, 1) = 1 THEN COALESCE(n.notify_wechat, s.notify_wechat, '') ELSE '' END,
+		       CASE WHEN COALESCE(n.enabled, 1) = 1 THEN COALESCE(n.notify_feishu, '') ELSE '' END
 		FROM schedules s
 		LEFT JOIN notification_configs n ON s.notification_config_id = n.id
 		WHERE s.id = ?
 	`, scheduleID).Scan(
 		&s.ID, &s.ProjectID, &s.Name, &s.Cron, &s.InspectionType,
-		&enabled, &s.NotificationConfigID, &s.NotificationConfigName, &s.NotifyEmail, &s.NotifyWechat,
+		&enabled, &s.NotificationConfigID, &s.NotificationConfigName, &s.NotifyEmail, &s.NotifyWechat, &s.NotifyFeishu,
 	)
 	if err != nil {
 		log.Printf("[scheduler] 任务 %d 配置查询失败: %v", scheduleID, err)
-		m.writeLog(scheduleID, 0, "failed", false, false, err.Error())
+		m.writeLog(scheduleID, 0, "failed", false, false, false, err.Error())
 		return
 	}
 	s.Enabled = enabled == 1
@@ -188,7 +189,7 @@ func (m *ScheduleManager) runSchedule(scheduleID int64) {
 	report, err := m.inspector.Execute(ctx, s.ProjectID, reportDate)
 	if err != nil {
 		log.Printf("[scheduler] 任务 %d 巡检执行失败: %v", scheduleID, err)
-		m.writeLog(scheduleID, 0, "failed", false, false, err.Error())
+		m.writeLog(scheduleID, 0, "failed", false, false, false, err.Error())
 		return
 	}
 
@@ -209,19 +210,19 @@ func (m *ScheduleManager) runSchedule(scheduleID int64) {
 
 	// 6. 发送通知（异步，不阻塞）
 	if m.notifier != nil {
-		m.notifier.AsyncNotify(projectName, group, reportDate, report, s.NotifyEmail, s.NotifyWechat)
+		m.notifier.AsyncNotify(projectName, group, reportDate, report, s.NotifyEmail, s.NotifyWechat, s.NotifyFeishu)
 	}
 
 	// 7. 记录日志
-	m.writeLog(scheduleID, report.ID, "success", s.NotifyEmail != "", s.NotifyWechat != "", "")
+	m.writeLog(scheduleID, report.ID, "success", s.NotifyEmail != "", s.NotifyWechat != "", s.NotifyFeishu != "", "")
 }
 
 // writeLog 写入 schedule_logs
-func (m *ScheduleManager) writeLog(scheduleID, reportID int64, status string, email, wechat bool, errMsg string) {
+func (m *ScheduleManager) writeLog(scheduleID, reportID int64, status string, email, wechat, feishu bool, errMsg string) {
 	_, err := store.DB.Exec(`
-		INSERT INTO schedule_logs (schedule_id, report_id, status, notified_email, notified_wechat, error_message)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, scheduleID, reportID, status, boolToInt(email), boolToInt(wechat), errMsg)
+		INSERT INTO schedule_logs (schedule_id, report_id, status, notified_email, notified_wechat, notified_feishu, error_message)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, scheduleID, reportID, status, boolToInt(email), boolToInt(wechat), boolToInt(feishu), errMsg)
 	if err != nil {
 		log.Printf("[scheduler] 写入日志失败: %v", err)
 	}

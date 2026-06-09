@@ -89,7 +89,7 @@ export default function ScheduleList() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-ds-text tracking-tight-apple">定时任务</h1>
-          <p className="text-sm text-ds-muted mt-1 leading-relaxed">配置自动巡检计划，支持邮件和企业微信通知</p>
+          <p className="text-sm text-ds-muted mt-1 leading-relaxed">配置自动巡检计划，支持邮件、企业微信和飞书通知</p>
         </div>
         <Button asChild>
           <Link to="/schedules/new" className="inline-flex items-center gap-1.5">
@@ -160,6 +160,11 @@ export default function ScheduleList() {
                           {s.notify_wechat && (
                             <span className="text-xs bg-ds-accent/10 text-ds-accent px-2 py-0.5 rounded-full" title="企业微信">
                               微信
+                            </span>
+                          )}
+                          {s.notify_feishu && (
+                            <span className="text-xs bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full" title="飞书">
+                              飞书
                             </span>
                           )}
                         </div>
@@ -245,6 +250,11 @@ export default function ScheduleList() {
                         微信
                       </span>
                     )}
+                    {s.notify_feishu && (
+                      <span className="text-xs bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full">
+                        飞书
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 pt-3 border-t border-ds-border">
                     <Button variant="ghost" size="sm" onClick={() => handleRun(s.id)}
@@ -318,6 +328,7 @@ export default function ScheduleList() {
                         <div className="flex items-center gap-3 mt-1 text-xs text-ds-muted">
                           {log.notified_email && <span>已发邮件</span>}
                           {log.notified_wechat && <span>已发微信</span>}
+                          {log.notified_feishu && <span>已发飞书</span>}
                           <span>{new Date(log.created_at).toLocaleString()}</span>
                         </div>
                       </div>

@@ -70,6 +70,7 @@ func createTables() error {
 			name TEXT NOT NULL,
 			notify_email TEXT DEFAULT '',
 			notify_wechat TEXT DEFAULT '',
+			notify_feishu TEXT DEFAULT '',
 			enabled INTEGER DEFAULT 1,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);`,
@@ -94,6 +95,7 @@ func createTables() error {
 			status TEXT,
 			notified_email INTEGER DEFAULT 0,
 			notified_wechat INTEGER DEFAULT 0,
+			notified_feishu INTEGER DEFAULT 0,
 			error_message TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE
@@ -112,6 +114,9 @@ func createTables() error {
 	}
 	if err := migrateNotificationConfigsV1(); err != nil {
 		return fmt.Errorf("failed to migrate notification configs: %w", err)
+	}
+	if err := migrateNotificationChannelsV2(); err != nil {
+		return fmt.Errorf("failed to migrate notification channels: %w", err)
 	}
 
 	return nil
@@ -236,6 +241,33 @@ func migrateNotificationConfigsV1() error {
 		if _, err := DB.Exec("UPDATE schedules SET notification_config_id = ? WHERE id = ?", configID, item.scheduleID); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// migrateNotificationChannelsV2 为通知配置和执行日志补充新增渠道字段
+func migrateNotificationChannelsV2() error {
+	configColumns, err := tableColumns("notification_configs")
+	if err != nil {
+		return err
+	}
+	if !configColumns["notify_feishu"] {
+		if _, err := DB.Exec("ALTER TABLE notification_configs ADD COLUMN notify_feishu TEXT DEFAULT ''"); err != nil {
+			return fmt.Errorf("add column notify_feishu failed: %w", err)
+		}
+		log.Printf("[migrate] added column notify_feishu to notification_configs")
+	}
+
+	logColumns, err := tableColumns("schedule_logs")
+	if err != nil {
+		return err
+	}
+	if !logColumns["notified_feishu"] {
+		if _, err := DB.Exec("ALTER TABLE schedule_logs ADD COLUMN notified_feishu INTEGER DEFAULT 0"); err != nil {
+			return fmt.Errorf("add column notified_feishu failed: %w", err)
+		}
+		log.Printf("[migrate] added column notified_feishu to schedule_logs")
 	}
 
 	return nil

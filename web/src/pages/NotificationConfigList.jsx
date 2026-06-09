@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Mail, MessageSquare, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Mail, MessageSquare, Pencil, Plus, Send, Trash2, X } from 'lucide-react'
 import { api } from '../api'
 import EmptyState from '../components/EmptyState'
 import Spinner from '../components/Spinner'
@@ -12,6 +12,7 @@ const EMPTY_FORM = {
   name: '',
   notify_email: '',
   notify_wechat: '',
+  notify_feishu: '',
   enabled: true,
 }
 
@@ -48,6 +49,7 @@ export default function NotificationConfigList() {
       name: cfg.name || '',
       notify_email: cfg.notify_email || '',
       notify_wechat: cfg.notify_wechat || '',
+      notify_feishu: cfg.notify_feishu || '',
       enabled: cfg.enabled !== false,
     })
     setConfirmId(null)
@@ -59,7 +61,7 @@ export default function NotificationConfigList() {
       toast.error('请填写配置名称')
       return
     }
-    if (!form.notify_email.trim() && !form.notify_wechat.trim()) {
+    if (!form.notify_email.trim() && !form.notify_wechat.trim() && !form.notify_feishu.trim()) {
       toast.error('至少填写一种通知渠道')
       return
     }
@@ -68,6 +70,7 @@ export default function NotificationConfigList() {
       name: form.name.trim(),
       notify_email: form.notify_email.trim(),
       notify_wechat: form.notify_wechat.trim(),
+      notify_feishu: form.notify_feishu.trim(),
       enabled: form.enabled,
     }
 
@@ -252,6 +255,17 @@ export default function NotificationConfigList() {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-semibold text-ds-text mb-2">飞书 Webhook</label>
+              <input
+                type="text"
+                value={form.notify_feishu}
+                onChange={e => updateField('notify_feishu', e.target.value)}
+                className="w-full px-4 py-2.5 border border-ds-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent transition-all"
+                placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+              />
+            </div>
+
             <div className="flex items-center gap-3">
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -296,7 +310,13 @@ function ChannelBadges({ cfg }) {
           微信
         </span>
       )}
-      {!cfg.notify_email && !cfg.notify_wechat && (
+      {cfg.notify_feishu && (
+        <span className="inline-flex items-center gap-1 text-xs bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full" title="飞书">
+          <Send className="w-3 h-3" />
+          飞书
+        </span>
+      )}
+      {!cfg.notify_email && !cfg.notify_wechat && !cfg.notify_feishu && (
         <span className="text-xs text-ds-muted">未配置渠道</span>
       )}
     </div>
