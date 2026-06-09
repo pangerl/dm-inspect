@@ -119,7 +119,7 @@ export default function ScheduleList() {
                   <th className="text-left px-5 py-3.5 font-medium">类型</th>
                   <th className="text-left px-5 py-3.5 font-medium">状态</th>
                   <th className="text-left px-5 py-3.5 font-medium">下次执行</th>
-                  <th className="text-left px-5 py-3.5 font-medium">通知</th>
+                  <th className="text-left px-5 py-3.5 font-medium">通知配置</th>
                   <th className="text-right px-5 py-3.5 font-medium">操作</th>
                 </tr>
               </thead>
@@ -147,17 +147,22 @@ export default function ScheduleList() {
                       {s.enabled ? formatNextRun(s.next_run) : '-'}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-1.5">
-                        {s.notify_email && (
-                          <span className="text-xs bg-ds-surface2 text-ds-muted px-2 py-0.5 rounded-full border border-ds-border" title={s.notify_email}>
-                            邮件
-                          </span>
-                        )}
-                        {s.notify_wechat && (
-                          <span className="text-xs bg-ds-accent/10 text-ds-accent px-2 py-0.5 rounded-full" title="企业微信">
-                            微信
-                          </span>
-                        )}
+                      <div className="space-y-1">
+                        <div className="text-xs text-ds-muted">
+                          {s.notification_config_name || '不通知'}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {s.notify_email && (
+                            <span className="text-xs bg-ds-surface2 text-ds-muted px-2 py-0.5 rounded-full border border-ds-border" title={s.notify_email}>
+                              邮件
+                            </span>
+                          )}
+                          {s.notify_wechat && (
+                            <span className="text-xs bg-ds-accent/10 text-ds-accent px-2 py-0.5 rounded-full" title="企业微信">
+                              微信
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-right">
@@ -227,6 +232,9 @@ export default function ScheduleList() {
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
+                    {s.notification_config_name && (
+                      <span className="text-xs text-ds-muted mr-1">{s.notification_config_name}</span>
+                    )}
                     {s.notify_email && (
                       <span className="text-xs bg-ds-surface2 text-ds-muted px-2 py-0.5 rounded-full border border-ds-border">
                         邮件

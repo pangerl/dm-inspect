@@ -51,7 +51,7 @@ func (m *ScheduleManager) Stop() {
 // LoadAll 从数据库加载所有启用的定时任务
 func (m *ScheduleManager) LoadAll() error {
 	rows, err := store.DB.Query(`
-		SELECT id, project_id, name, cron, inspection_type, enabled, notify_email, notify_wechat
+		SELECT id, project_id, name, cron, inspection_type, enabled, COALESCE(notification_config_id, 0)
 		FROM schedules WHERE enabled = 1
 	`)
 	if err != nil {
@@ -65,7 +65,7 @@ func (m *ScheduleManager) LoadAll() error {
 		var enabled int
 		if err := rows.Scan(
 			&s.ID, &s.ProjectID, &s.Name, &s.Cron, &s.InspectionType,
-			&enabled, &s.NotifyEmail, &s.NotifyWechat,
+			&enabled, &s.NotificationConfigID,
 		); err != nil {
 			log.Printf("[scheduler] 加载任务失败: %v", err)
 			continue
@@ -149,11 +149,16 @@ func (m *ScheduleManager) runSchedule(scheduleID int64) {
 	var s model.Schedule
 	var enabled int
 	err := store.DB.QueryRow(`
-		SELECT id, project_id, name, cron, inspection_type, enabled, notify_email, notify_wechat
-		FROM schedules WHERE id = ?
+		SELECT s.id, s.project_id, s.name, s.cron, s.inspection_type, s.enabled,
+		       COALESCE(s.notification_config_id, 0), COALESCE(n.name, ''),
+		       CASE WHEN COALESCE(n.enabled, 1) = 1 THEN COALESCE(n.notify_email, s.notify_email, '') ELSE '' END,
+		       CASE WHEN COALESCE(n.enabled, 1) = 1 THEN COALESCE(n.notify_wechat, s.notify_wechat, '') ELSE '' END
+		FROM schedules s
+		LEFT JOIN notification_configs n ON s.notification_config_id = n.id
+		WHERE s.id = ?
 	`, scheduleID).Scan(
 		&s.ID, &s.ProjectID, &s.Name, &s.Cron, &s.InspectionType,
-		&enabled, &s.NotifyEmail, &s.NotifyWechat,
+		&enabled, &s.NotificationConfigID, &s.NotificationConfigName, &s.NotifyEmail, &s.NotifyWechat,
 	)
 	if err != nil {
 		log.Printf("[scheduler] 任务 %d 配置查询失败: %v", scheduleID, err)

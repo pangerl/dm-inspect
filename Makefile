@@ -6,7 +6,12 @@ build:
 
 # 清理端口占用
 kill-port:
-	@fuser -k 8090/tcp 2>/dev/null || true
+	@if command -v lsof >/dev/null 2>&1; then \
+		pids=$$(lsof -ti tcp:8090); \
+		if [ -n "$$pids" ]; then kill $$pids; fi; \
+	elif command -v fuser >/dev/null 2>&1; then \
+		fuser -k 8090/tcp 2>/dev/null || true; \
+	fi
 
 # 运行（开发）- 自动清理旧进程
 run: kill-port

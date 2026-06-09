@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 import { api } from '../api'
 import Spinner from '../components/Spinner'
 import { useToast } from '../components/Toast'
@@ -27,6 +27,7 @@ export default function ScheduleEdit() {
   const isEdit = Boolean(id)
 
   const [projects, setProjects] = useState([])
+  const [notificationConfigs, setNotificationConfigs] = useState([])
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
 
@@ -36,14 +37,19 @@ export default function ScheduleEdit() {
     cron: '',
     inspection_type: 'daily',
     enabled: true,
-    notify_email: '',
-    notify_wechat: '',
+    notification_config_id: '',
   })
 
   useEffect(() => {
-    api.get('/projects')
-      .then(data => setProjects(data || []))
-      .catch(() => {})
+    Promise.all([
+      api.get('/projects'),
+      api.get('/notification-configs'),
+    ])
+      .then(([projectData, notificationData]) => {
+        setProjects(projectData || [])
+        setNotificationConfigs(notificationData || [])
+      })
+      .catch(err => toast.error(err.message))
   }, [])
 
   useEffect(() => {
@@ -56,8 +62,7 @@ export default function ScheduleEdit() {
           cron: data.cron || '',
           inspection_type: data.inspection_type || 'daily',
           enabled: data.enabled !== false,
-          notify_email: data.notify_email || '',
-          notify_wechat: data.notify_wechat || '',
+          notification_config_id: data.notification_config_id ? String(data.notification_config_id) : '',
         })
       })
       .catch(err => toast.error(err.message))
@@ -78,6 +83,7 @@ export default function ScheduleEdit() {
     const payload = {
       ...form,
       project_id: parseInt(form.project_id, 10),
+      notification_config_id: form.notification_config_id ? parseInt(form.notification_config_id, 10) : 0,
     }
 
     setSaving(true)
@@ -201,30 +207,29 @@ export default function ScheduleEdit() {
 
           {/* 通知配置 */}
           <div className="bg-ds-surface2 rounded-[18px] p-5 space-y-5">
-            <h4 className="text-sm font-semibold text-ds-text">通知配置</h4>
-
-            <div>
-              <label className="block text-sm font-medium text-ds-muted mb-2">邮件收件人</label>
-              <input
-                type="text"
-                value={form.notify_email}
-                onChange={e => updateField('notify_email', e.target.value)}
-                className="w-full px-4 py-2.5 border border-ds-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent transition-all"
-                placeholder="例如：ops@example.com, admin@example.com"
-              />
-              <p className="text-xs text-ds-muted mt-1.5">多个邮箱用逗号分隔，需配置 SMTP 环境变量</p>
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold text-ds-text">通知配置</h4>
+              <Link to="/notifications" className="text-xs text-ds-accent hover:underline inline-flex items-center gap-1">
+                <Plus className="w-3.5 h-3.5" />
+                管理配置
+              </Link>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-ds-muted mb-2">企业微信 Webhook</label>
-              <input
-                type="text"
-                value={form.notify_wechat}
-                onChange={e => updateField('notify_wechat', e.target.value)}
+              <label className="block text-sm font-medium text-ds-muted mb-2">选择通知配置</label>
+              <select
+                value={form.notification_config_id}
+                onChange={e => updateField('notification_config_id', e.target.value)}
                 className="w-full px-4 py-2.5 border border-ds-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ds-accent focus:border-transparent transition-all"
-                placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
-              />
-              <p className="text-xs text-ds-muted mt-1.5">仅发送精简摘要，完整报告请查看邮件或报告详情</p>
+              >
+                <option value="">— 不发送通知 —</option>
+                {notificationConfigs.map(cfg => (
+                  <option key={cfg.id} value={String(cfg.id)}>
+                    {cfg.name}{cfg.enabled ? '' : '（已禁用）'}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-ds-muted mt-1.5">通知渠道在“通知配置”中集中维护，修改后会影响所有引用它的任务</p>
             </div>
           </div>
         </div>

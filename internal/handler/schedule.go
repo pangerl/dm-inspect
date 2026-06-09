@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -29,10 +30,12 @@ func GetScheduleManager() *service.ScheduleManager {
 func ListSchedules(c *gin.Context) {
 	rows, err := store.DB.Query(`
 		SELECT s.id, s.project_id, s.name, s.cron, s.inspection_type, s.enabled,
-		       s.notify_email, s.notify_wechat, s.created_at,
-		       p.name as project_name
+		       COALESCE(s.notification_config_id, 0), COALESCE(n.name, ''),
+		       COALESCE(n.notify_email, s.notify_email, ''), COALESCE(n.notify_wechat, s.notify_wechat, ''),
+		       s.created_at, p.name as project_name
 		FROM schedules s
 		LEFT JOIN projects p ON s.project_id = p.id
+		LEFT JOIN notification_configs n ON s.notification_config_id = n.id
 		ORDER BY s.id DESC
 	`)
 	if err != nil {
@@ -53,8 +56,8 @@ func ListSchedules(c *gin.Context) {
 		var enabled int
 		if err := rows.Scan(
 			&s.ID, &s.ProjectID, &s.Name, &s.Cron, &s.InspectionType, &enabled,
-			&s.NotifyEmail, &s.NotifyWechat, &s.CreatedAt,
-			&s.ProjectName,
+			&s.NotificationConfigID, &s.NotificationConfigName,
+			&s.NotifyEmail, &s.NotifyWechat, &s.CreatedAt, &s.ProjectName,
 		); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan schedule"})
 			return
@@ -84,11 +87,15 @@ func CreateSchedule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name、cron、project_id 为必填字段"})
 		return
 	}
+	if !notificationConfigExists(c, s.NotificationConfigID) {
+		return
+	}
 
 	result, err := store.DB.Exec(`
-		INSERT INTO schedules (project_id, name, cron, inspection_type, enabled, notify_email, notify_wechat)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, s.ProjectID, s.Name, s.Cron, s.InspectionType, boolToInt(s.Enabled), s.NotifyEmail, s.NotifyWechat)
+		INSERT INTO schedules (project_id, name, cron, inspection_type, enabled, notification_config_id, notify_email, notify_wechat)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, s.ProjectID, s.Name, s.Cron, s.InspectionType, boolToInt(s.Enabled),
+		nullInt64(s.NotificationConfigID), s.NotifyEmail, s.NotifyWechat)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create schedule"})
 		return
@@ -96,7 +103,6 @@ func CreateSchedule(c *gin.Context) {
 
 	id, _ := result.LastInsertId()
 	s.ID = id
-	s.Enabled = true
 
 	// 若启用，注册到 cron
 	if s.Enabled && scheduleMgr != nil {
@@ -119,18 +125,31 @@ func GetSchedule(c *gin.Context) {
 
 	var s model.Schedule
 	var enabled int
+	var notificationConfigID sql.NullInt64
+	var notificationConfigName sql.NullString
 	err = store.DB.QueryRow(`
-		SELECT id, project_id, name, cron, inspection_type, enabled, notify_email, notify_wechat, created_at
-		FROM schedules WHERE id = ?
+		SELECT s.id, s.project_id, s.name, s.cron, s.inspection_type, s.enabled,
+		       s.notification_config_id, n.name,
+		       COALESCE(n.notify_email, s.notify_email, ''),
+		       COALESCE(n.notify_wechat, s.notify_wechat, ''), s.created_at
+		FROM schedules s
+		LEFT JOIN notification_configs n ON s.notification_config_id = n.id
+		WHERE s.id = ?
 	`, id).Scan(
 		&s.ID, &s.ProjectID, &s.Name, &s.Cron, &s.InspectionType, &enabled,
-		&s.NotifyEmail, &s.NotifyWechat, &s.CreatedAt,
+		&notificationConfigID, &notificationConfigName, &s.NotifyEmail, &s.NotifyWechat, &s.CreatedAt,
 	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found"})
 		return
 	}
 	s.Enabled = enabled == 1
+	if notificationConfigID.Valid {
+		s.NotificationConfigID = notificationConfigID.Int64
+	}
+	if notificationConfigName.Valid {
+		s.NotificationConfigName = notificationConfigName.String
+	}
 	c.JSON(http.StatusOK, s)
 }
 
@@ -151,14 +170,17 @@ func UpdateSchedule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name、cron、project_id 为必填字段"})
 		return
 	}
+	if !notificationConfigExists(c, s.NotificationConfigID) {
+		return
+	}
 
 	_, err = store.DB.Exec(`
 		UPDATE schedules
 		SET project_id = ?, name = ?, cron = ?, inspection_type = ?, enabled = ?,
-		    notify_email = ?, notify_wechat = ?
+		    notification_config_id = ?, notify_email = ?, notify_wechat = ?
 		WHERE id = ?
 	`, s.ProjectID, s.Name, s.Cron, s.InspectionType, boolToInt(s.Enabled),
-		s.NotifyEmail, s.NotifyWechat, id)
+		nullInt64(s.NotificationConfigID), s.NotifyEmail, s.NotifyWechat, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update schedule"})
 		return
@@ -272,6 +294,29 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+func nullInt64(v int64) interface{} {
+	if v == 0 {
+		return nil
+	}
+	return v
+}
+
+func notificationConfigExists(c *gin.Context, id int64) bool {
+	if id == 0 {
+		return true
+	}
+	var count int
+	if err := store.DB.QueryRow("SELECT COUNT(*) FROM notification_configs WHERE id = ?", id).Scan(&count); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check notification config"})
+		return false
+	}
+	if count == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "notification_config_id 不存在"})
+		return false
+	}
+	return true
 }
 
 // 兼容旧版 handler 中的 scan 类型断言（避免 sql.NullInt64 问题）

@@ -152,15 +152,27 @@ type Highlight struct {
 
 // Schedule 定时巡检任务
 type Schedule struct {
-	ID             int64     `json:"id"`
-	ProjectID      int64     `json:"project_id"`
-	Name           string    `json:"name"`
-	Cron           string    `json:"cron"`
-	InspectionType string    `json:"inspection_type"` // daily / monthly / quarterly / yearly
-	Enabled        bool      `json:"enabled"`
-	NotifyEmail    string    `json:"notify_email"`    // 逗号分隔多个邮箱
-	NotifyWechat   string    `json:"notify_wechat"`   // 企业微信 webhook URL
-	CreatedAt      time.Time `json:"created_at"`
+	ID                     int64     `json:"id"`
+	ProjectID              int64     `json:"project_id"`
+	Name                   string    `json:"name"`
+	Cron                   string    `json:"cron"`
+	InspectionType         string    `json:"inspection_type"` // daily / monthly / quarterly / yearly
+	Enabled                bool      `json:"enabled"`
+	NotificationConfigID   int64     `json:"notification_config_id,omitempty"`
+	NotificationConfigName string    `json:"notification_config_name,omitempty"`
+	NotifyEmail            string    `json:"notify_email"`  // 逗号分隔多个邮箱
+	NotifyWechat           string    `json:"notify_wechat"` // 企业微信 webhook URL
+	CreatedAt              time.Time `json:"created_at"`
+}
+
+// NotificationConfig 可复用通知配置
+type NotificationConfig struct {
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	NotifyEmail  string    `json:"notify_email"`  // 逗号分隔多个邮箱
+	NotifyWechat string    `json:"notify_wechat"` // 企业微信 webhook URL
+	Enabled      bool      `json:"enabled"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // ScheduleLog 定时任务执行记录

@@ -39,6 +39,13 @@ func Setup(r *gin.Engine) {
 		api.POST("/schedules/:id/run", handler.RunSchedule)
 		api.GET("/schedules/:id/logs", handler.ListScheduleLogs)
 
+		// 通知配置
+		api.GET("/notification-configs", handler.ListNotificationConfigs)
+		api.POST("/notification-configs", handler.CreateNotificationConfig)
+		api.GET("/notification-configs/:id", handler.GetNotificationConfig)
+		api.PUT("/notification-configs/:id", handler.UpdateNotificationConfig)
+		api.DELETE("/notification-configs/:id", handler.DeleteNotificationConfig)
+
 		// 报告查询
 		api.GET("/reports", handler.ListReports)
 		api.GET("/reports/:id", handler.GetReport)

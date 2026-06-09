@@ -10,6 +10,7 @@
 - **容器情况**：各机器运行中容器数汇总，支持展示容器服务详情（名称、镜像、状态）与端口连通状态
 - **告警聚合**：对接 N9E，应用层过滤 group 标签，按 S1/S2/S3 分级展示
 - **定时巡检**：基于 Cron 表达式自动执行巡检，支持邮件（HTML 完整报告）和企业微信机器人（精简摘要）通知
+- **通知配置复用**：邮件收件人和企业微信 Webhook 独立维护，多个定时任务可复用同一份通知配置
 - **预设模板**：3 种内置预设，一键填充 YAML；支持基础模式（表单配置）与高级模式（直接编辑 YAML）
 - **模板校验**：保存时后端自动校验 YAML 格式，即时报错
 - **快速创建**：向导式三步流程，选择场景预设后填写 group 标签即可一键创建项目
@@ -148,6 +149,8 @@ container_ports_query: "net_response_result_code{group='{{.group}}'}"
 
 ### 方式三：定时自动巡检
 
+先访问 `/notifications` 创建通知配置（可选），集中维护邮件收件人和企业微信 Webhook。
+
 访问 `/schedules/new`，配置 Cron 表达式自动执行：
 
 | 预设 | 表达式 | 说明 |
@@ -157,7 +160,7 @@ container_ports_query: "net_response_result_code{group='{{.group}}'}"
 | 每周一 09:00 | `0 0 9 * * 1` | 周初汇总 |
 | 每月 1 日 09:00 | `0 0 9 1 * *` | 月初汇总 |
 
-支持同时配置邮件通知（完整 HTML 报告）和企业微信机器人（精简摘要）。
+支持选择一份通知配置，同时发送邮件通知（完整 HTML 报告）和企业微信机器人（精简摘要）。修改通知配置后，引用它的定时任务会在后续执行中自动使用最新配置。
 
 ## API 接口
 
@@ -200,6 +203,16 @@ container_ports_query: "net_response_result_code{group='{{.group}}'}"
 | DELETE | `/api/schedules/:id` | 删除定时任务 |
 | POST | `/api/schedules/:id/run` | 手动立即执行 |
 | GET | `/api/schedules/:id/logs` | 执行历史 |
+
+### 通知配置
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/notification-configs` | 通知配置列表 |
+| POST | `/api/notification-configs` | 创建通知配置 |
+| GET | `/api/notification-configs/:id` | 获取通知配置 |
+| PUT | `/api/notification-configs/:id` | 更新通知配置 |
+| DELETE | `/api/notification-configs/:id` | 删除通知配置（被定时任务引用时拒绝） |
 
 ### 报告查询
 
